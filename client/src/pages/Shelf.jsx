@@ -11,6 +11,14 @@ import { useAuth } from '../context/AuthContext';
 import { getSocket } from '../utils/socket';
 import api from '../utils/api';
 
+function isPendingEnrichment(link) {
+  if (!link) return false;
+  const summaryMissing = !link.summary || !link.summary.trim();
+  const vibesMissing = !Array.isArray(link.vibes) || link.vibes.length === 0;
+  const titleFallback = link.title === link.url;
+  return summaryMissing || vibesMissing || titleFallback;
+}
+
 export default function Shelf() {
   const { id: shelfId } = useParams();
   const { user } = useAuth();
@@ -60,6 +68,25 @@ export default function Shelf() {
       s.off('presence-update');
     };
   }, [user, shelfId]);
+
+  // Fallback: when realtime is disabled, poll while links are still enriching.
+  useEffect(() => {
+    if (!shelfId) return;
+
+    const hasPending = links.some(isPendingEnrichment);
+    if (!hasPending) return;
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const { data } = await api.get(`/api/links/shelf/${shelfId}`);
+        setLinks(data);
+      } catch {
+        // Best-effort UI refresh; keep silent to avoid noisy errors.
+      }
+    }, 2500);
+
+    return () => window.clearInterval(intervalId);
+  }, [links, shelfId]);
 
   const handleNewLink = (newLink) =>
     setLinks((prev) => prev.find((l) => l._id === newLink._id) ? prev : [newLink, ...prev]);
