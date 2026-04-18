@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import LinkInputBar from '../components/LinkInputBar';
 import LinkCard from '../components/LinkCard';
 import ShelfSwitcher from '../components/ShelfSwitcher';
 import ShareShelfModal from '../components/ShareShelfModal';
+import LiveCursors from '../components/LiveCursors';
+import LineagePanel from '../components/LineagePanel';
 import { useAuth } from '../context/AuthContext';
 import { getSocket } from '../utils/socket';
 import api from '../utils/api';
@@ -12,6 +14,7 @@ import api from '../utils/api';
 export default function Shelf() {
   const { id: shelfId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [links, setLinks] = useState([]);
   const [shelfData, setShelfData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,20 +36,14 @@ export default function Shelf() {
 
   // Socket.IO: join room, listen for live events
   useEffect(() => {
-    if (!user || !shelfId) return;
     const s = getSocket();
+    if (!s || !user || !shelfId) return;
+    
     if (!s.connected) s.connect();
     s.emit('join-shelf', { shelfId, userName: user.name });
 
-    s.on('link-created', (newLink) => {
-      setLinks((prev) => prev.find((l) => l._id === newLink._id) ? prev : [newLink, ...prev]);
-    });
-
-    // Fires when Puppeteer+Gemini enrichment completes — updates the card in place
-    s.on('link-enriched', (enriched) => {
-      setLinks((prev) => prev.map((l) => l._id === enriched._id ? { ...l, ...enriched } : l));
-    });
-
+    s.on('link-created',  (newLink)  => setLinks((prev) => prev.find((l) => l._id === newLink._id) ? prev : [newLink, ...prev]));
+    s.on('link-enriched', (enriched) => setLinks((prev) => prev.map((l) => l._id === enriched._id ? { ...l, ...enriched } : l)));
     s.on('presence-update', (evt) => {
       setPresence((prev) => {
         const copy = { ...prev };
@@ -67,58 +64,79 @@ export default function Shelf() {
   const handleNewLink = (newLink) =>
     setLinks((prev) => prev.find((l) => l._id === newLink._id) ? prev : [newLink, ...prev]);
 
-  // Weather computed from recent activity
+  const handleFork = async () => {
+    const name = window.prompt('Name your forked shelf:');
+    if (!name?.trim()) return;
+    try {
+      const { data } = await api.post('/api/shelves/fork', { sourceShelfId: shelfId, newName: name.trim() });
+      navigate(`/shelf/${data._id}`);
+    } catch {
+      alert('Could not fork this shelf. You may not have access.');
+    }
+  };
+
   const recentCount = links.filter((l) => (Date.now() - new Date(l.createdAt)) / 60000 < 5).length;
   const weather = recentCount >= 3 ? '⛈ Stormy' : recentCount >= 1 ? '🌤 Breezy' : '🌫 Foggy';
-
-  // Other users currently on this shelf (exclude self)
   const activeUsers = Object.values(presence).filter((name) => name !== user?.name);
-
-  // Is current user the shelf owner?
-  const isOwner = shelfData?.ownerId?._id === user?._id || shelfData?.ownerId === user?._id;
+  const isOwner = shelfData?.ownerId?._id === user?._id ||
+                  shelfData?.ownerId?._id === user?.id  ||
+                  String(shelfData?.ownerId) === String(user?._id || user?.id);
 
   return (
     <Layout>
-      <div className="flex flex-col gap-8">
+      {/* shelf-container is relative so LiveCursors can position absolutely inside */}
+      <div id="shelf-container" className="relative flex flex-col gap-8">
+        <LiveCursors shelfId={shelfId} currentUser={user} />
+
+        {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="theme-hero-title text-3xl font-bold">
+            <h1 className="text-3xl font-bold text-[#1A1A2E]">
               {shelfData ? shelfData.name : 'Loading shelf…'}
             </h1>
             {user?.curatorArchetype && (
-              <p className="text-xs theme-muted mt-1">
+              <p className="text-xs text-[#6B7280] mt-1">
                 You are a <span className="font-semibold">{user.curatorArchetype.name}</span>.
               </p>
             )}
             {activeUsers.length > 0 && (
-              <p className="text-xs theme-muted mt-0.5 italic">
+              <p className="text-xs text-[#6B7280] mt-0.5 italic">
                 Live now: {activeUsers.join(', ')}
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Controls */}
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
             <ShelfSwitcher />
+            <button
+              onClick={handleFork}
+              className="text-xs font-semibold text-[#6B7280] bg-white/70 border border-white/80 rounded-full px-3 py-1.5 hover:bg-white transition"
+            >
+              🌿 Fork
+            </button>
             {isOwner && (
               <button
                 onClick={() => setShowShare(true)}
-                className="theme-button-secondary text-xs font-semibold rounded-full px-3 py-1.5 transition"
+                className="text-xs font-semibold text-[#F4845F] bg-white/70 border border-white/80 rounded-full px-3 py-1.5 hover:bg-white transition"
               >
                 Share shelf
               </button>
             )}
-            <span className="text-sm font-medium theme-muted bg-white/50 border border-white/60 rounded-full px-4 py-1.5 backdrop-blur">
+            <span className="text-sm font-medium text-[#6B7280] bg-white/50 border border-white/60 rounded-full px-4 py-1.5 backdrop-blur">
               {weather}
             </span>
           </div>
         </div>
 
+        {/* URL Input */}
         <LinkInputBar shelfId={shelfId} onLinkCreated={handleNewLink} />
 
+        {/* Link Grid */}
         {loading ? (
-          <p className="theme-muted text-center mt-12">Loading your shelf…</p>
+          <p className="text-[#6B7280] text-center mt-12">Loading your shelf…</p>
         ) : links.length === 0 ? (
-          <p className="theme-muted text-center mt-12">
+          <p className="text-[#6B7280] text-center mt-12">
             Your shelf is empty. Drop a link above to bring it to life. 🌱
           </p>
         ) : (
@@ -126,11 +144,12 @@ export default function Shelf() {
             {links.map((link) => <LinkCard key={link._id} link={link} />)}
           </div>
         )}
+
+        {/* Lineage Panel — only shows if this shelf was forked or has forks */}
+        <LineagePanel shelfId={shelfId} />
       </div>
 
-      {showShare && (
-        <ShareShelfModal shelfId={shelfId} onClose={() => setShowShare(false)} />
-      )}
+      {showShare && <ShareShelfModal shelfId={shelfId} onClose={() => setShowShare(false)} />}
     </Layout>
   );
 }
