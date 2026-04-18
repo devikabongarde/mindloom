@@ -94,4 +94,22 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// PATCH /api/auth/me — update defaultShelfId (or other safe fields)
+router.patch('/me', authMiddleware, async (req, res) => {
+  try {
+    const { defaultShelfId } = req.body;
+    const update = {};
+    if (defaultShelfId) update.defaultShelfId = defaultShelfId;
+    const user = await User.findByIdAndUpdate(req.user.id, update, { new: true }).select('-passwordHash');
+    res.json({
+      _id: user._id, name: user.name, email: user.email,
+      defaultShelfId: user.defaultShelfId,
+      vibeStats: user.vibeStats,
+      curatorArchetype: computeArchetype(user.vibeStats),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 export default router;

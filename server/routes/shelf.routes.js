@@ -6,18 +6,22 @@ import {
   getMyShelves,
   inviteMemberToShelf,
   acceptShelfInvite,
+  forkShelf,
+  getShelfLineage,
 } from '../controllers/shelf.controller.js';
 
 const router = Router();
 
-// Team shelf actions
+// Named action routes MUST come before /:id wildcard
 router.post('/team',          authMiddleware, createTeamShelf);
 router.get('/mine',           authMiddleware, getMyShelves);
 router.post('/invite',        authMiddleware, inviteMemberToShelf);
 router.post('/invite/accept', authMiddleware, acceptShelfInvite);
+router.post('/fork',          authMiddleware, forkShelf);
 
-// GET /api/shelves/:id — get shelf details with members populated
-router.get('/:id', authMiddleware, async (req, res) => {
+// Parameterized routes
+router.get('/:id/lineage',    authMiddleware, getShelfLineage);
+router.get('/:id',            authMiddleware, async (req, res) => {
   try {
     const shelf = await Shelf.findById(req.params.id)
       .populate('ownerId', 'name email')
@@ -29,7 +33,6 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/shelves — create a shelf (generic)
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, isPublic, weather } = req.body;

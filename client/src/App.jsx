@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import api from './utils/api';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Landing from './pages/Landing';
@@ -20,19 +22,56 @@ function ProtectedRoute({ children }) {
 }
 
 function ShelfRedirect() {
-  const { user, loading } = useAuth();
-  if (loading) return (
-    <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center text-[#6B7280]">
-      Loading...
+  const { user, login, loading } = useAuth();
+  const [resolving, setResolving] = useState(false);
+  const [shelfId, setShelfId] = useState(user?.defaultShelfId || null);
+
+  useEffect(() => {
+    // If we already have a shelfId, nothing to do
+    if (shelfId || !user || resolving) return;
+
+    setResolving(true);
+    // Try to find an existing shelf first, otherwise create one
+    api.get('/api/shelves/mine')
+      .then(({ data: shelves }) => {
+        if (shelves.length > 0) return shelves[0];
+        return api.post('/api/shelves', {
+          name: `${user.name}'s Shelf`,
+          isPublic: false,
+          weather: 'Foggy',
+        }).then((r) => r.data);
+      })
+      .then((shelf) => {
+        // Patch the backend user so future logins won't need to repeat this
+        return api.patch('/api/auth/me', { defaultShelfId: shelf._id })
+          .catch(() => null) // non-fatal if endpoint doesn't exist yet
+          .then(() => shelf);
+      })
+      .then((shelf) => {
+        // Update local auth state so user.defaultShelfId is set
+        login(localStorage.getItem('shelflife_token'), {
+          ...user,
+          defaultShelfId: shelf._id,
+        });
+        setShelfId(shelf._id);
+      })
+      .catch(console.error)
+      .finally(() => setResolving(false));
+  }, [user, shelfId, resolving, login]);
+
+  if (loading || resolving) return (
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center gap-3 text-[#6B7280]">
+      <div className="w-6 h-6 rounded-full border-2 border-[#F4845F] border-t-transparent animate-spin" />
+      <span>Setting up your shelf…</span>
     </div>
   );
   if (!user) return <Navigate to="/login" replace />;
-  if (!user.defaultShelfId) return (
+  if (!shelfId) return (
     <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center text-[#6B7280]">
-      Setting up your shelf…
+      Could not find your shelf. Please log out and back in.
     </div>
   );
-  return <Navigate to={`/shelf/${user.defaultShelfId}`} replace />;
+  return <Navigate to={`/shelf/${shelfId}`} replace />;
 }
 
 function AppRoutes() {
