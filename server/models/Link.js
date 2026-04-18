@@ -23,7 +23,9 @@ const linkSchema = new mongoose.Schema(
     suggestions: [
       {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-        text: { type: String, required: true, trim: true, maxlength: 300 },
+        type: { type: String, enum: ['comment', 'link'], default: 'comment' },
+        text: { type: String, default: '', trim: true, maxlength: 300 },
+        url: { type: String, default: null, trim: true },
         createdAt: { type: Date, default: Date.now },
       },
     ],

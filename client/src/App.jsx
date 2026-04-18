@@ -10,6 +10,7 @@ import Shelf from './pages/Shelf';
 import Social from './pages/Social';
 import Notifications from './pages/Notifications';
 import CompostHeap from './pages/CompostHeap';
+import KnowledgeGraph from './pages/KnowledgeGraph';
 import Profile from './pages/Profile';
 import AcceptInvite from './pages/AcceptInvite';
 
@@ -89,6 +90,7 @@ function AppRoutes() {
       <Route path="/social"         element={<ProtectedRoute><Social /></ProtectedRoute>} />
       <Route path="/notifications"  element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/compost"        element={<ProtectedRoute><CompostHeap /></ProtectedRoute>} />
+      <Route path="/knowledge-graph" element={<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>} />
       <Route path="/profile"        element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/invite/:token"  element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
       <Route path="*"               element={<Navigate to={user ? '/dashboard' : '/'} replace />} />

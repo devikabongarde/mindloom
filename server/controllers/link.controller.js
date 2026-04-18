@@ -341,7 +341,9 @@ export const getLinkSuggestions = async (req, res) => {
 
     const suggestions = (link.suggestions || []).map((item) => ({
       _id: item._id,
+      type: item.type || 'comment',
       text: item.text,
+      url: item.url || null,
       createdAt: item.createdAt,
       user: {
         _id: item.userId?._id || null,
@@ -358,14 +360,37 @@ export const getLinkSuggestions = async (req, res) => {
 // POST /api/links/:id/suggestions
 export const addLinkSuggestion = async (req, res) => {
   try {
+    const type = req.body?.type === 'link' ? 'link' : 'comment';
     const text = String(req.body?.text || '').trim();
-    if (!text) return res.status(400).json({ message: 'Suggestion text is required' });
-    if (text.length > 300) return res.status(400).json({ message: 'Suggestion must be 300 characters or fewer' });
+    const rawUrl = String(req.body?.url || '').trim();
+
+    let finalUrl = null;
+    let finalText = text;
+
+    if (type === 'link') {
+      if (!rawUrl) {
+        return res.status(400).json({ message: 'Link URL is required' });
+      }
+      finalUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+      try {
+        // Validate URL shape
+        // eslint-disable-next-line no-new
+        new URL(finalUrl);
+      } catch {
+        return res.status(400).json({ message: 'Please provide a valid URL' });
+      }
+
+      finalText = text || finalUrl;
+    } else {
+      if (!text) return res.status(400).json({ message: 'Suggestion text is required' });
+    }
+
+    if (finalText.length > 300) return res.status(400).json({ message: 'Suggestion must be 300 characters or fewer' });
 
     const link = await Link.findById(req.params.id).select('shelfId suggestions');
     if (!link) return res.status(404).json({ message: 'Link not found' });
 
-    link.suggestions.push({ userId: req.user.id, text, createdAt: new Date() });
+    link.suggestions.push({ userId: req.user.id, type, text: finalText, url: finalUrl, createdAt: new Date() });
     await link.save();
 
     const fresh = await Link.findById(req.params.id)
@@ -375,7 +400,9 @@ export const addLinkSuggestion = async (req, res) => {
     const latest = fresh.suggestions[fresh.suggestions.length - 1];
     const payload = {
       _id: latest._id,
+      type: latest.type || 'comment',
       text: latest.text,
+      url: latest.url || null,
       createdAt: latest.createdAt,
       user: {
         _id: latest.userId?._id || null,
@@ -394,5 +421,41 @@ export const addLinkSuggestion = async (req, res) => {
     res.status(201).json(payload);
   } catch (err) {
     res.status(500).json({ message: 'Server error adding suggestion' });
+  }
+};
+
+// DELETE /api/links/:id/suggestions/:suggestionId
+export const deleteLinkSuggestion = async (req, res) => {
+  try {
+    const { id, suggestionId } = req.params;
+
+    const link = await Link.findById(id).select('shelfId suggestions');
+    if (!link) return res.status(404).json({ message: 'Link not found' });
+
+    const suggestion = (link.suggestions || []).find((item) => String(item._id) === String(suggestionId));
+    if (!suggestion) return res.status(404).json({ message: 'Suggestion not found' });
+
+    const shelf = await Shelf.findById(link.shelfId).select('ownerId');
+    const isShelfOwner = String(shelf?.ownerId || '') === String(req.user.id);
+    const isSuggestionOwner = String(suggestion.userId || '') === String(req.user.id);
+
+    if (!isShelfOwner && !isSuggestionOwner) {
+      return res.status(403).json({ message: 'Only the suggestion owner or shelf owner can delete this entry' });
+    }
+
+    link.suggestions = (link.suggestions || []).filter((item) => String(item._id) !== String(suggestionId));
+    await link.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(String(link.shelfId)).emit('suggestion-delete', {
+        linkId: id,
+        suggestionId,
+      });
+    }
+
+    res.json({ suggestionId, deleted: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error deleting suggestion' });
   }
 };

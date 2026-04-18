@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
-import { MessageSquare, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { MessageSquare, Trash2, Link2 } from 'lucide-react';
 import VibePills from './VibePills';
 import LinkDetailModal from './LinkDetailModal';
 import { statusConfig } from '../utils/vibeConfig';
 import { getSocket } from '../utils/socket';
 import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 const EMOJIS = ['🔥', '💀', '⚡', '🌀'];
+const URL_REGEX = /((?:https?:\/\/|www\.)[^\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?)/gi;
 
 function getDecayStyle(status) {
   if (status === 'aging') return 'opacity-60 grayscale-[40%]';
@@ -15,15 +17,79 @@ function getDecayStyle(status) {
   return 'opacity-100';
 }
 
+function toAbsoluteUrl(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  return `https://${raw}`;
+}
+
+function renderTextWithLinks(text = '') {
+  const raw = String(text || '');
+  const parts = raw.split(URL_REGEX);
+
+  return parts.map((part, index) => {
+    if (URL_REGEX.test(part)) {
+      URL_REGEX.lastIndex = 0;
+      const href = toAbsoluteUrl(part);
+      return (
+        <a
+          key={`${part}-${index}`}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[#F4845F] hover:underline break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+
+    URL_REGEX.lastIndex = 0;
+    return <span key={`text-${index}`}>{part}</span>;
+  });
+}
+
 export default function LinkCard({ link, canDelete = false, onDelete = null }) {
+  const { user } = useAuth();
   const [showDetail, setShowDetail]   = useState(false);
   const [reactions, setReactions]     = useState(link.reactions || []);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activePopover, setActivePopover] = useState(null); // 'comment' | 'link' | null
   const [suggestions, setSuggestions] = useState(link.suggestions || []);
   const [suggestionText, setSuggestionText] = useState('');
+  const [referenceUrl, setReferenceUrl] = useState('');
+  const [referenceNote, setReferenceNote] = useState('');
   const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [deletingSuggestionId, setDeletingSuggestionId] = useState(null);
+  const closeTimerRef = useRef(null);
+  const holdOpenUntilRef = useRef(0);
   const status = statusConfig[link.status] || statusConfig.fresh;
   const screenshotSrc = link.screenshot ? `${SERVER_URL}${link.screenshot}` : null;
+
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const keepPopoverOpen = (type, ms = 1800) => {
+    holdOpenUntilRef.current = Date.now() + ms;
+    setActivePopover(type);
+    clearCloseTimer();
+  };
+
+  const schedulePopoverClose = (baseDelay = 280) => {
+    clearCloseTimer();
+    const now = Date.now();
+    const extraHold = Math.max(0, holdOpenUntilRef.current - now);
+    const delay = Math.max(baseDelay, extraHold);
+    closeTimerRef.current = window.setTimeout(() => {
+      setActivePopover(null);
+      closeTimerRef.current = null;
+    }, delay);
+  };
 
   useEffect(() => {
     setSuggestions(link.suggestions || []);
@@ -43,11 +109,17 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
         return [...prev, suggestion];
       });
     };
+    const suggestionDeleteHandler = ({ linkId, suggestionId }) => {
+      if (String(linkId) !== String(link._id)) return;
+      setSuggestions((prev) => prev.filter((item) => String(item._id) !== String(suggestionId)));
+    };
     s.on('reaction-update', handler);
     s.on('suggestion-update', suggestionHandler);
+    s.on('suggestion-delete', suggestionDeleteHandler);
     return () => {
       s.off('reaction-update', handler);
       s.off('suggestion-update', suggestionHandler);
+      s.off('suggestion-delete', suggestionDeleteHandler);
     };
   }, [link._id]);
 
@@ -65,7 +137,9 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
 
   const normalizeSuggestion = (item) => ({
     _id: item?._id,
+    type: item?.type || 'comment',
     text: item?.text || '',
+    url: item?.url || null,
     createdAt: item?.createdAt || new Date().toISOString(),
     user: item?.user || {
       _id: item?.userId?._id || item?.userId || null,
@@ -83,8 +157,10 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
   };
 
   useEffect(() => {
-    if (showSuggestions) loadSuggestions();
-  }, [showSuggestions]);
+    if (activePopover) loadSuggestions();
+  }, [activePopover]);
+
+  useEffect(() => () => clearCloseTimer(), []);
 
   const handleAddSuggestion = async () => {
     const text = suggestionText.trim();
@@ -92,7 +168,7 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
 
     try {
       setSuggestionLoading(true);
-      const { data } = await api.post(`/api/links/${link._id}/suggestions`, { text });
+      const { data } = await api.post(`/api/links/${link._id}/suggestions`, { type: 'comment', text });
       setSuggestions((prev) => {
         if (prev.some((item) => String(item._id) === String(data?._id))) return prev;
         return [...prev, normalizeSuggestion(data)];
@@ -105,6 +181,50 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
     }
   };
 
+  const handleAddReferenceLink = async () => {
+    const url = referenceUrl.trim();
+    const text = referenceNote.trim();
+    if (!url || suggestionLoading) return;
+
+    try {
+      setSuggestionLoading(true);
+      const { data } = await api.post(`/api/links/${link._id}/suggestions`, { type: 'link', url, text });
+      setSuggestions((prev) => {
+        if (prev.some((item) => String(item._id) === String(data?._id))) return prev;
+        return [...prev, normalizeSuggestion(data)];
+      });
+      setReferenceUrl('');
+      setReferenceNote('');
+    } catch {
+      // silent
+    } finally {
+      setSuggestionLoading(false);
+    }
+  };
+
+  const canDeleteSuggestion = (item) => {
+    const myId = String(user?._id || user?.id || '');
+    const ownerId = String(item?.user?._id || item?.userId || '');
+    return Boolean(myId && ownerId && myId === ownerId);
+  };
+
+  const handleDeleteSuggestion = async (suggestionId) => {
+    if (!suggestionId || deletingSuggestionId) return;
+
+    try {
+      setDeletingSuggestionId(String(suggestionId));
+      await api.delete(`/api/links/${link._id}/suggestions/${suggestionId}`);
+      setSuggestions((prev) => prev.filter((item) => String(item._id) !== String(suggestionId)));
+    } catch {
+      // silent
+    } finally {
+      setDeletingSuggestionId(null);
+    }
+  };
+
+  const commentSuggestions = suggestions.filter((item) => (item.type || 'comment') === 'comment');
+  const linkSuggestions = suggestions.filter((item) => (item.type || 'comment') === 'link');
+
   const countEmoji = (emoji) => reactions.filter((r) => r.emoji === emoji).length;
 
   return (
@@ -114,7 +234,7 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
           bg-white/45 backdrop-blur-xl border border-white/60
           shadow-lg hover:shadow-xl hover:-translate-y-1
           transition-all duration-300 cursor-pointer group
-          ${showSuggestions ? 'z-[120]' : 'z-0'}
+          ${activePopover ? 'z-[120]' : 'z-0'}
           ${getDecayStyle(link.status)}`}
         onClick={() => setShowDetail(true)}
         onKeyDown={(e) => {
@@ -188,40 +308,67 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
             <div className="flex items-center gap-3">
               <div
                 className="relative z-[130]"
-                onMouseEnter={() => setShowSuggestions(true)}
-                onMouseLeave={() => setShowSuggestions(false)}
+                onMouseEnter={() => {
+                  setActivePopover('comment');
+                  clearCloseTimer();
+                }}
+                onMouseLeave={() => schedulePopoverClose(300)}
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (activePopover === 'comment') {
+                      setActivePopover(null);
+                      clearCloseTimer();
+                      return;
+                    }
+                    keepPopoverOpen('comment', 1800);
+                  }}
                   className="relative text-[#6B7280] hover:text-[#1A1A2E] transition"
                   title="Suggestions"
                   aria-label="Open suggestions"
                 >
                   <MessageSquare size={16} />
-                  {suggestions.length > 0 && (
+                  {commentSuggestions.length > 0 && (
                     <span className="absolute -right-2 -top-2 min-w-[16px] h-4 px-1 rounded-full bg-[#F4845F] text-white text-[10px] font-bold inline-flex items-center justify-center">
-                      {suggestions.length > 99 ? '99+' : suggestions.length}
+                      {commentSuggestions.length > 99 ? '99+' : commentSuggestions.length}
                     </span>
                   )}
                 </button>
 
-                {showSuggestions && (
+                {activePopover === 'comment' && (
                   <div
                     className="absolute right-0 bottom-full mb-2 z-[140] w-[270px] rounded-xl bg-white/95 border border-white/80 p-3 shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
+                    onMouseEnter={() => clearCloseTimer()}
+                    onMouseLeave={() => schedulePopoverClose(320)}
                   >
                     <p className="text-[11px] font-semibold text-[#20314d] uppercase tracking-[0.14em]">Link Suggestions</p>
                     <p className="text-xs theme-muted mt-1">Collaborative notes for this link only.</p>
 
                     <div className="mt-2 max-h-32 overflow-y-auto flex flex-col gap-1.5 pr-1">
-                      {suggestions.length === 0 ? (
+                      {commentSuggestions.length === 0 ? (
                         <p className="text-xs theme-muted">No suggestions yet.</p>
                       ) : (
-                        suggestions.map((item) => (
+                        commentSuggestions.map((item) => (
                           <div key={item._id} className="rounded-lg bg-white/70 border border-white/80 px-2 py-1.5">
-                            <p className="text-[11px] font-semibold text-[#2b4265]">{item.user?.name || 'Unknown'}</p>
-                            <p className="text-xs text-[#1A1A2E] leading-relaxed">{item.text}</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] font-semibold text-[#2b4265]">{item.user?.name || 'Unknown'}</p>
+                              {canDeleteSuggestion(item) && (
+                                <button
+                                  onClick={() => handleDeleteSuggestion(item._id)}
+                                  disabled={deletingSuggestionId === String(item._id)}
+                                  title="Delete comment"
+                                  aria-label="Delete comment"
+                                  className="text-[#cc3d3d] hover:text-[#a92828] transition disabled:opacity-50"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#1A1A2E] leading-relaxed">{renderTextWithLinks(item.text)}</p>
                           </div>
                         ))
                       )}
@@ -232,6 +379,8 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
                         value={suggestionText}
                         onChange={(e) => setSuggestionText(e.target.value)}
                         onKeyDown={(e) => e.stopPropagation()}
+                        onFocus={() => keepPopoverOpen('comment', 3000)}
+                        onBlur={() => schedulePopoverClose(550)}
                         placeholder="Add a suggestion..."
                         maxLength={300}
                         className="flex-1 rounded-lg bg-white/85 border border-white/80 px-2.5 py-1.5 text-xs text-[#20314d] outline-none"
@@ -243,6 +392,117 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
                         className="text-xs font-semibold rounded-lg px-2.5 py-1.5 bg-[#F4845F] text-white disabled:opacity-60"
                       >
                         Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div
+                className="relative z-[130]"
+                onMouseEnter={() => {
+                  setActivePopover('link');
+                  clearCloseTimer();
+                }}
+                onMouseLeave={() => schedulePopoverClose(300)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (activePopover === 'link') {
+                      setActivePopover(null);
+                      clearCloseTimer();
+                      return;
+                    }
+                    keepPopoverOpen('link', 1800);
+                  }}
+                  className="relative text-[#6B7280] hover:text-[#1A1A2E] transition"
+                  title="Link references"
+                  aria-label="Open link references"
+                >
+                  <Link2 size={16} />
+                  {linkSuggestions.length > 0 && (
+                    <span className="absolute -right-2 -top-2 min-w-[16px] h-4 px-1 rounded-full bg-[#4F46E5] text-white text-[10px] font-bold inline-flex items-center justify-center">
+                      {linkSuggestions.length > 99 ? '99+' : linkSuggestions.length}
+                    </span>
+                  )}
+                </button>
+
+                {activePopover === 'link' && (
+                  <div
+                    className="absolute right-0 bottom-full mb-2 z-[140] w-[290px] rounded-xl bg-white/95 border border-white/80 p-3 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onMouseEnter={() => clearCloseTimer()}
+                    onMouseLeave={() => schedulePopoverClose(320)}
+                  >
+                    <p className="text-[11px] font-semibold text-[#20314d] uppercase tracking-[0.14em]">Linked References</p>
+                    <p className="text-xs theme-muted mt-1">Add direct links related to this card.</p>
+
+                    <div className="mt-2 max-h-32 overflow-y-auto flex flex-col gap-1.5 pr-1">
+                      {linkSuggestions.length === 0 ? (
+                        <p className="text-xs theme-muted">No linked references yet.</p>
+                      ) : (
+                        linkSuggestions.map((item) => (
+                          <div key={item._id} className="rounded-lg bg-white/70 border border-white/80 px-2 py-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] font-semibold text-[#2b4265]">{item.user?.name || 'Unknown'}</p>
+                              {canDeleteSuggestion(item) && (
+                                <button
+                                  onClick={() => handleDeleteSuggestion(item._id)}
+                                  disabled={deletingSuggestionId === String(item._id)}
+                                  title="Delete linked reference"
+                                  aria-label="Delete linked reference"
+                                  className="text-[#cc3d3d] hover:text-[#a92828] transition disabled:opacity-50"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <a
+                              href={toAbsoluteUrl(item.url || item.text)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-[#4F46E5] hover:underline break-all"
+                            >
+                              {item.url || item.text}
+                            </a>
+                            {item.text && item.url && item.text !== item.url && (
+                              <p className="text-xs text-[#1A1A2E] leading-relaxed mt-0.5">{item.text}</p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      <input
+                        value={referenceUrl}
+                        onChange={(e) => setReferenceUrl(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onFocus={() => keepPopoverOpen('link', 3000)}
+                        onBlur={() => schedulePopoverClose(550)}
+                        placeholder="Paste URL..."
+                        className="w-full rounded-lg bg-white/85 border border-white/80 px-2.5 py-1.5 text-xs text-[#20314d] outline-none"
+                      />
+                      <input
+                        value={referenceNote}
+                        onChange={(e) => setReferenceNote(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onFocus={() => keepPopoverOpen('link', 3000)}
+                        onBlur={() => schedulePopoverClose(550)}
+                        placeholder="Optional note"
+                        maxLength={300}
+                        className="w-full rounded-lg bg-white/85 border border-white/80 px-2.5 py-1.5 text-xs text-[#20314d] outline-none"
+                      />
+                      <button
+                        onClick={handleAddReferenceLink}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        disabled={suggestionLoading || !referenceUrl.trim()}
+                        className="self-end text-xs font-semibold rounded-lg px-2.5 py-1.5 bg-[#4F46E5] text-white disabled:opacity-60"
+                      >
+                        Add Link
                       </button>
                     </div>
                   </div>
