@@ -15,6 +15,13 @@ const REALTIME_ENABLED = process.env.REALTIME_ENABLED === "true";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
+const corsOrigin = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (origin === CLIENT_URL) return callback(null, true);
+  if (origin.startsWith('chrome-extension://')) return callback(null, true);
+  return callback(new Error('Not allowed by CORS'));
+};
+
 const app = express();
 const server = http.createServer(app);
 
@@ -35,7 +42,7 @@ if (REALTIME_ENABLED) {
 app.set('io', io);
 
 // Middleware
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: true, limit: '8mb' }));
 app.use('/static', express.static(path.join(__dirname, 'public')));

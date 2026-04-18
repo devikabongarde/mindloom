@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "ShelfLife Quick Save",
+  "description": "Save the current tab URL into ShelfLife with one click.",
+  "version": "1.0.0",
+  "permissions": [
+    "storage",
+    "tabs",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://localhost:5000/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/logoo.png",
+    "32": "icons/logoo.png",
+    "48": "icons/logoo.png",
+    "128": "icons/logoo.png"
+  },
+  "action": {
+    "default_title": "Save tab to ShelfLife",
+    "default_icon": "icons/logoo.png"
+  },
+  "options_page": "options.html"
+}
