@@ -1,13 +1,14 @@
 import Link from '../models/Link.js';
 import Shelf from '../models/Shelf.js';
+import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { enrichUrlWithAI, classifyVibes } from '../services/ai.service.js';
 
 // Helper: compute decay status from lastClickedAt
 function computeStatus(lastClickedAt) {
   const minutesIdle = (Date.now() - new Date(lastClickedAt)) / 1000 / 60;
-  if (minutesIdle < 1) return { status: 'fresh', minutesIdle: Math.floor(minutesIdle) };
-  if (minutesIdle < 2) return { status: 'aging', minutesIdle: Math.floor(minutesIdle) };
+  if (minutesIdle < 10) return { status: 'fresh', minutesIdle: Math.floor(minutesIdle) };
+  if (minutesIdle < 30) return { status: 'aging', minutesIdle: Math.floor(minutesIdle) };
   return { status: 'dead', minutesIdle: Math.floor(minutesIdle) };
 }
 
@@ -292,6 +293,19 @@ export const reactToLink = async (req, res) => {
       link.reactions.splice(existingIdx, 1);
     } else {
       link.reactions.push({ userId, emoji });
+
+      if (String(link.addedBy) !== String(userId)) {
+        const actor = await User.findById(req.user.id).select('name').lean();
+        await Notification.create({
+          userId: link.addedBy,
+          actorId: req.user.id,
+          type: 'link_reacted',
+          title: 'Link got a reaction',
+          message: `${actor?.name || 'Someone'} reacted ${emoji} to "${link.title || 'a link'}"`,
+          meta: { linkId: link._id, shelfId: link.shelfId, emoji },
+          isRead: false,
+        });
+      }
     }
 
     await link.save();
@@ -409,6 +423,21 @@ export const addLinkSuggestion = async (req, res) => {
         name: latest.userId?.name || 'Unknown',
       },
     };
+
+    if (String(fresh.addedBy) !== String(req.user.id)) {
+      const actor = await User.findById(req.user.id).select('name').lean();
+      await Notification.create({
+        userId: fresh.addedBy,
+        actorId: req.user.id,
+        type: latest.type === 'link' ? 'link_reference' : 'link_comment',
+        title: latest.type === 'link' ? 'New linked reference' : 'New link comment',
+        message: latest.type === 'link'
+          ? `${actor?.name || 'Someone'} linked a reference to "${fresh.title || 'your link'}"`
+          : `${actor?.name || 'Someone'} commented on "${fresh.title || 'your link'}"`,
+        meta: { linkId: fresh._id, shelfId: fresh.shelfId, suggestionId: latest._id },
+        isRead: false,
+      });
+    }
 
     const io = req.app.get('io');
     if (io) {

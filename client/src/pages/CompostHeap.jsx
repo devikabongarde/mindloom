@@ -100,7 +100,7 @@ export default function CompostHeap() {
             {dead.map((link) => (
               <div
                 key={link._id}
-                className="theme-card rounded-[20px] p-5 flex flex-col gap-3 opacity-40 grayscale hover:opacity-60 transition-all duration-300"
+                className="theme-card rounded-[20px] p-5 flex flex-col gap-3 opacity-100 grayscale-[100%] hover:grayscale-[95%] transition-all duration-300"
               >
                 <h3 className="theme-card-content font-bold text-base line-clamp-2">
                   {link.title}

@@ -3,18 +3,13 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
 export default function Layout({ children }) {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
-      const stored = window.localStorage.getItem('sidebar-collapsed');
-      if (stored === '1') {
-        setIsSidebarCollapsed(true);
-      }
+      return window.localStorage.getItem('sidebar-collapsed') === '1';
     } catch {
-      // Ignore storage access errors.
+      return false;
     }
-  }, []);
+  });
 
   useEffect(() => {
     try {

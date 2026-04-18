@@ -261,3 +261,12 @@ body::after {
     transform: translate3d(0, -46px, 0);
   }
 }
+
+@keyframes decayFade {
+  0% {
+    opacity: var(--decay-opacity, 1);
+  }
+  100% {
+    opacity: calc(var(--decay-opacity, 1) - 0.08);
+  }
+}

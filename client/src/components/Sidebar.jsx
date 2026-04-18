@@ -8,10 +8,13 @@ const navItems = [
   { to: '/dashboard', icon: Home,     label: 'Dashboard'    },
   { to: '/shelf',     icon: BookOpen, label: 'My Shelf'     },
   { to: '/social',    icon: Users,    label: 'Social'       },
-  { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/knowledge-graph', icon: Network, label: 'Knowledge Graph' },
   { to: '/compost',   icon: Trash2,   label: 'Compost Heap' },
-  { to: '/profile',   icon: User,     label: 'Profile'      },
+];
+
+const utilityItems = [
+  { to: '/notifications', icon: Bell, label: 'Notifications' },
+  { to: '/profile', icon: User, label: 'Profile' },
 ];
 
 export default function Sidebar({ isCollapsed = false, onToggleCollapse = () => {} }) {
@@ -58,7 +61,11 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse = () => 
         </button>
 
         <div className={`theme-card-content flex items-center pb-5 border-b border-white/60 ${isCollapsed ? 'justify-center pt-6' : 'gap-3 pr-10'}`}>
-          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A] shadow-lg shadow-[#F4845F]/30 flex-shrink-0" />
+          <img
+            src="/logoo.png"
+            alt="ShelfLife logo"
+            className="w-11 h-11 rounded-full object-cover shadow-sm shadow-slate-400/30 flex-shrink-0"
+          />
           {!isCollapsed && (
             <div>
               <span className="font-bold text-lg bg-gradient-to-r from-[#F4845F] to-[#E8617A] bg-clip-text text-transparent tracking-tight font-['Sora'] block leading-none">
@@ -98,6 +105,36 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse = () => 
             </NavLink>
           ))}
         </nav>
+
+        <div className={`mt-auto flex flex-col gap-1 pb-4 ${isCollapsed ? 'items-center' : ''}`}>
+          {!isCollapsed && <p className="theme-subtle-label font-semibold mb-2 px-3">Account</p>}
+          {utilityItems.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              title={label}
+              className={({ isActive }) =>
+                `relative flex items-center rounded-2xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-white/72 text-[#20314d] shadow-sm border border-white/70'
+                    : 'text-[#5f7498] hover:bg-white/45 hover:text-[#f4845f]'
+                } ${isCollapsed ? 'justify-center w-11 h-11 px-0 py-0' : 'gap-3 px-4 py-3'}`
+              }
+            >
+              <Icon size={18} className="shrink-0" />
+              {!isCollapsed && <span className="flex-1">{label}</span>}
+              {to === '/notifications' && unreadCount > 0 && (
+                isCollapsed ? (
+                  <span className="absolute right-1.5 top-1.5 w-2.5 h-2.5 rounded-full bg-[#F4845F] border border-white/80" aria-hidden="true" />
+                ) : (
+                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#F4845F] text-white text-[11px] font-bold inline-flex items-center justify-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )
+              )}
+            </NavLink>
+          ))}
+        </div>
 
         <button
           onClick={handleLogout}

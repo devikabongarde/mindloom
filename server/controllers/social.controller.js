@@ -406,6 +406,19 @@ export async function addShelfComment(req, res) {
       text,
     });
 
+    if (String(shelf.ownerId || '') !== String(req.user.id)) {
+      const actor = await User.findById(req.user.id).select('name').lean();
+      await Notification.create({
+        userId: shelf.ownerId,
+        actorId: req.user.id,
+        type: 'shelf_comment',
+        title: 'New shelf comment',
+        message: `${actor?.name || 'Someone'} commented on "${shelf.name || 'your shelf'}"`,
+        meta: { shelfId: shelf._id, commentId: comment._id },
+        isRead: false,
+      });
+    }
+
     const populated = await ShelfComment.findById(comment._id).populate('userId', 'name').lean();
 
     res.status(201).json({

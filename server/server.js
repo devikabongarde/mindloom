@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes.js';
 import shelfRoutes from './routes/shelf.routes.js';
 import linkRoutes from './routes/link.routes.js';
 import socialRoutes from './routes/social.routes.js';
+import { startDecayReminderScheduler } from './services/decayReminder.service.js';
 
 const REALTIME_ENABLED = process.env.REALTIME_ENABLED === "true";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -111,6 +112,8 @@ async function startServer() {
     } else {
       console.log('Redis/Socket.IO adapter disabled');
     }
+
+    startDecayReminderScheduler();
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

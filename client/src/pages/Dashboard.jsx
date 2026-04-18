@@ -34,6 +34,8 @@ export default function Dashboard() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationPreview, setNotificationPreview] = useState([]);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -164,6 +166,35 @@ export default function Dashboard() {
     };
   }, [searchQuery, allShelfIds, dashboardLinks]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadNotificationPreview = async () => {
+      if (!user) {
+        setNotificationPreview([]);
+        setNotificationUnreadCount(0);
+        return;
+      }
+
+      try {
+        const { data } = await api.get('/api/social/notifications', { params: { limit: 3 } });
+        if (cancelled) return;
+        setNotificationPreview(Array.isArray(data?.notifications) ? data.notifications : []);
+        setNotificationUnreadCount(Number(data?.unreadCount || 0));
+      } catch {
+        if (!cancelled) {
+          setNotificationPreview([]);
+          setNotificationUnreadCount(0);
+        }
+      }
+    };
+
+    loadNotificationPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const hour = now.getHours();
   const greeting =
     hour >= 5 && hour < 12
@@ -186,6 +217,11 @@ export default function Dashboard() {
   const recentLinks = [...dashboardLinks]
     .sort((a, b) => toTime(b.createdAt || b.lastClickedAt) - toTime(a.createdAt || a.lastClickedAt))
     .slice(0, 3);
+
+  const totalLinkCount = dashboardLinks.length;
+  const forkedShelfCount = Object.values(shelfIsForkedById).filter(Boolean).length;
+  const latestLink = recentLinks[0] || null;
+  const staleLinkCount = dashboardLinks.filter((link) => link.status === 'dead').length;
 
   const formatMinutesIdle = (minutesIdle) => {
     if (typeof minutesIdle !== 'number' || Number.isNaN(minutesIdle)) return 'now';
@@ -214,9 +250,9 @@ export default function Dashboard() {
     <Layout>
       <div className="flex flex-col gap-6 min-h-[60vh]">
         <div className="flex flex-wrap gap-3 items-center justify-center lg:justify-start">
-          <span className="theme-button-secondary inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold">Mindfulness</span>
-          <Link to="/shelf" className="theme-button-secondary inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold hover:-translate-y-0.5 transition-transform">Focus</Link>
-          <Link to="/compost" className="theme-button-secondary inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold hover:-translate-y-0.5 transition-transform">Relaxation</Link>
+          <span className="theme-button-secondary inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold">Saved</span>
+          <Link to="/shelf" className="theme-button-secondary inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold hover:-translate-y-0.5 transition-transform">Shelf</Link>
+          <Link to="/compost" className="theme-button-secondary inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold hover:-translate-y-0.5 transition-transform">Compost</Link>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
@@ -382,12 +418,25 @@ export default function Dashboard() {
               whileHover={{ y: -3, scale: 1.004 }}
               transition={{ type: 'spring', stiffness: 220, damping: 22 }}
             >
-              <div className="theme-card-content space-y-2">
-                <p className="theme-subtle-label font-semibold">Meditate</p>
-                <h2 className="text-2xl font-bold text-[#20314d]">Capture and curate</h2>
-                <p className="theme-muted text-sm leading-relaxed">Drop links into your shelf and let ShelfLife organize them into a living archive.</p>
+              <div className="theme-card-content space-y-4">
+                <p className="theme-subtle-label font-semibold">At a glance</p>
+                <h2 className="text-2xl font-bold text-[#20314d]">Workspace snapshot</h2>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="theme-panel rounded-2xl px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.12em] theme-muted">Shelves</p>
+                    <p className="text-lg font-bold text-[#20314d] mt-0.5">{allShelfIds.length}</p>
+                  </div>
+                  <div className="theme-panel rounded-2xl px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.12em] theme-muted">Links</p>
+                    <p className="text-lg font-bold text-[#20314d] mt-0.5">{totalLinkCount}</p>
+                  </div>
+                  <div className="theme-panel rounded-2xl px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.12em] theme-muted">Forked</p>
+                    <p className="text-lg font-bold text-[#20314d] mt-0.5">{forkedShelfCount}</p>
+                  </div>
+                </div>
               </div>
-              <Link to="/shelf" className="mt-5 text-sm font-semibold text-[#F4845F] hover:underline">Go to shelf →</Link>
+              <Link to="/knowledge-graph" className="mt-5 text-sm font-semibold text-[#F4845F] hover:underline">Open knowledge graph →</Link>
             </motion.section>
 
             <motion.section
@@ -399,18 +448,31 @@ export default function Dashboard() {
               whileHover={{ y: -3, scale: 1.004 }}
               transition={{ type: 'spring', stiffness: 220, damping: 22 }}
             >
-              <div className="theme-card-content space-y-2">
-                <p className="theme-subtle-label font-semibold">Music</p>
-                <h2 className="text-2xl font-bold text-[#20314d]">Recent activity</h2>
-                <p className="theme-muted text-sm leading-relaxed">The same soft-glass surface now frames your shelf, compost, and profile actions.</p>
-              </div>
-              <div className="flex items-center gap-3 mt-5">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A] opacity-90" />
-                <div>
-                  <p className="text-sm font-semibold text-[#20314d]">{shelfState}</p>
-                  <p className="text-xs theme-muted">{allShelfIds.length > 0 ? 'Insights across all your shelves' : 'Create a shelf to unlock insights'}</p>
+              <div className="theme-card-content space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="theme-subtle-label font-semibold">Notifications</p>
+                    <h2 className="text-2xl font-bold text-[#20314d]">Inbox preview</h2>
+                  </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#F4845F] bg-[#F4845F]/10 border border-[#F4845F]/20 rounded-full px-2 py-1">
+                    {notificationUnreadCount} unread
+                  </span>
                 </div>
+
+                {notificationPreview.length === 0 ? (
+                  <p className="theme-muted text-sm leading-relaxed">No recent notifications. You are all caught up.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {notificationPreview.slice(0, 2).map((item) => (
+                      <div key={item._id} className="theme-panel rounded-xl px-3 py-2.5">
+                        <p className="text-sm font-semibold text-[#20314d] truncate">{item.title || 'Notification'}</p>
+                        <p className="theme-muted text-xs truncate">{item.message || 'New activity in your network.'}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+              <Link to="/notifications" className="mt-5 text-sm font-semibold text-[#F4845F] hover:underline">Open notifications →</Link>
             </motion.section>
 
             <motion.section
@@ -424,21 +486,34 @@ export default function Dashboard() {
             >
               <div className="theme-card-content grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
                 <div>
-                  <p className="theme-subtle-label font-semibold mb-2">Move</p>
-                  <h2 className="text-2xl md:text-3xl font-bold text-[#20314d]">Your shelf is active and your archive is alive.</h2>
-                  <p className="theme-muted text-sm md:text-base mt-3 leading-relaxed max-w-2xl">This area can hold the same short-form guidance, search, or quick shortcuts from the reference layout without changing any backend behavior.</p>
+                  <p className="theme-subtle-label font-semibold mb-2">Action center</p>
+                  <h2 className="text-2xl md:text-3xl font-bold text-[#20314d]">Pick up exactly where you left off.</h2>
+                  <p className="theme-muted text-sm md:text-base mt-3 leading-relaxed max-w-2xl">
+                    {latestLink
+                      ? `Latest saved: ${latestLink.title || getDomain(latestLink.url)}. Continue from your shelf, check your graph, or clear stale items in compost.`
+                      : 'No links yet. Start by saving your first useful link, then organize and map it from Shelf and Knowledge Graph.'}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <Link to="/shelf" className="theme-button rounded-full px-4 py-2 text-sm font-semibold">Open shelf</Link>
+                    <Link to="/knowledge-graph" className="theme-button-secondary rounded-full px-4 py-2 text-sm font-semibold">View graph</Link>
+                    <Link to="/compost" className="theme-button-secondary rounded-full px-4 py-2 text-sm font-semibold">Review compost</Link>
+                  </div>
                 </div>
                 <div className="w-full md:w-[260px]">
                   <div className="theme-panel rounded-[28px] p-4">
                     <div className="theme-panel-content flex items-center gap-3">
                       <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#ffd8c8] via-[#f7b8d7] to-[#b7e7ff]" />
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-[#20314d]">Ease into shelf mode</p>
-                        <p className="text-xs theme-muted">Mindful organization · 5 min</p>
+                        <p className="text-sm font-semibold text-[#20314d]">{shelfState}</p>
+                        <p className="text-xs theme-muted">
+                          {latestLink
+                            ? `${getDomain(latestLink.url)} · added ${new Date(latestLink.createdAt).toLocaleDateString()}`
+                            : 'Create a shelf to unlock insights'}
+                        </p>
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-white/80 border border-white/70 flex items-center justify-center text-[#F4845F]">
+                      <Link to="/shelf" className="w-8 h-8 rounded-full bg-white/80 border border-white/70 flex items-center justify-center text-[#F4845F]">
                         <ArrowUpRight size={16} />
-                      </div>
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -516,14 +591,24 @@ export default function Dashboard() {
                     <ArrowUpRight size={20} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-[#20314d]">{allShelfIds.length > 0 ? 'Shelves ready' : 'Shelf setup needed'}</p>
-                    <p className="text-xs theme-muted">{allShelfIds.length > 0 ? 'Using all your shelves for dashboard insights.' : 'Create your first shelf to unlock this view.'}</p>
+                    <p className="text-sm font-semibold text-[#20314d]">Today priorities</p>
+                    <p className="text-xs theme-muted">Use this list to jump straight into pending work.</p>
                   </div>
                 </div>
 
-                <div className="theme-panel rounded-[24px] p-4">
-                  <p className="theme-subtle-label font-semibold mb-1">Now</p>
-                  <p className="theme-muted text-sm leading-relaxed">Open the shelf, inspect compost, or review your profile. All interactions keep working as before.</p>
+                <div className="theme-panel rounded-[24px] p-3 space-y-2">
+                  <Link to="/notifications" className="flex items-center justify-between rounded-xl px-3 py-2 bg-white/55 hover:bg-white/80 transition">
+                    <span className="text-sm text-[#20314d]">Unread notifications</span>
+                    <span className="text-xs font-semibold text-[#F4845F]">{notificationUnreadCount}</span>
+                  </Link>
+                  <Link to="/compost" className="flex items-center justify-between rounded-xl px-3 py-2 bg-white/55 hover:bg-white/80 transition">
+                    <span className="text-sm text-[#20314d]">Stale links in compost</span>
+                    <span className="text-xs font-semibold text-[#F4845F]">{staleLinkCount}</span>
+                  </Link>
+                  <Link to="/shelf" className="flex items-center justify-between rounded-xl px-3 py-2 bg-white/55 hover:bg-white/80 transition">
+                    <span className="text-sm text-[#20314d]">Total saved links</span>
+                    <span className="text-xs font-semibold text-[#F4845F]">{totalLinkCount}</span>
+                  </Link>
                 </div>
               </div>
             </motion.div>
@@ -538,12 +623,12 @@ export default function Dashboard() {
               transition={{ type: 'spring', stiffness: 220, damping: 22 }}
             >
               <div className="theme-card-content space-y-4">
-                <p className="theme-subtle-label font-semibold">Ask anything…</p>
-                <div className="theme-panel rounded-full flex items-center gap-3 px-4 py-3">
-                  <span className="theme-muted text-sm flex-1">Type a shortcut or jump route</span>
-                  <div className="w-8 h-8 rounded-full bg-white/80 border border-white/70 flex items-center justify-center text-[#F4845F]">
-                    <ArrowUpRight size={16} />
-                  </div>
+                <p className="theme-subtle-label font-semibold">Quick jump</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link to="/social" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Social</Link>
+                  <Link to="/notifications" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Alerts</Link>
+                  <Link to="/profile" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Profile</Link>
+                  <Link to="/knowledge-graph" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Graph</Link>
                 </div>
               </div>
             </motion.div>

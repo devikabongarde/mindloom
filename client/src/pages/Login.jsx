@@ -32,7 +32,11 @@ export default function Login() {
       <div className="theme-card w-full max-w-[420px] mx-4 p-10 rounded-[24px] shadow-[0_20px_40px_rgba(26,26,46,0.1)]">
         <div className="theme-card-content">
         <div className="flex items-center gap-2 mb-6">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A] shadow-lg shadow-[#F4845F]/40" />
+          <img
+            src="/logo-white.png"
+            alt="ShelfLife logo"
+            className="w-7 h-7 rounded-full object-cover shadow-sm shadow-slate-400/30"
+          />
           <span className="font-bold text-lg bg-gradient-to-r from-[#F4845F] to-[#E8617A] bg-clip-text text-transparent font-['Sora']">
             SHELFLIFE
           </span>

@@ -10,11 +10,29 @@ import { useAuth } from '../context/AuthContext';
 const SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 const EMOJIS = ['🔥', '💀', '⚡', '🌀'];
 const URL_REGEX = /((?:https?:\/\/|www\.)[^\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?)/gi;
+const DECAY_FRESH_MINUTES = 10;
+const DECAY_DEAD_MINUTES = 30;
 
-function getDecayStyle(status) {
-  if (status === 'aging') return 'opacity-60 grayscale-[40%]';
-  if (status === 'dead')  return 'opacity-30 grayscale-[90%] scale-95';
-  return 'opacity-100';
+function clamp01(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function getDecayMetrics(minutesIdle) {
+  const idle = Number.isFinite(minutesIdle) ? Math.max(0, minutesIdle) : 0;
+  const progress = clamp01(idle / DECAY_DEAD_MINUTES);
+  const lifePercent = clamp01(1 - progress);
+
+  let phase = 'fresh';
+  if (idle >= DECAY_DEAD_MINUTES) phase = 'dead';
+  else if (idle >= DECAY_FRESH_MINUTES) phase = 'aging';
+
+  const minutesToCompost = Math.max(0, DECAY_DEAD_MINUTES - idle);
+  const lifeLabel =
+    phase === 'dead'
+      ? 'In compost zone'
+      : `${Math.max(1, Math.ceil(minutesToCompost))}m to compost`;
+
+  return { idle, progress, lifePercent, phase, lifeLabel };
 }
 
 function toAbsoluteUrl(value = '') {
@@ -62,10 +80,26 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
   const [referenceNote, setReferenceNote] = useState('');
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [deletingSuggestionId, setDeletingSuggestionId] = useState(null);
+  const [tick, setTick] = useState(() => Date.now());
   const closeTimerRef = useRef(null);
   const holdOpenUntilRef = useRef(0);
-  const status = statusConfig[link.status] || statusConfig.fresh;
+  const eventTime = new Date(link.lastClickedAt || link.createdAt || Date.now()).getTime();
+  const calculatedIdle = Number.isFinite(eventTime)
+    ? Math.floor((tick - eventTime) / 60000)
+    : 0;
+  const liveMinutesIdle = Math.max(Number(link.minutesIdle || 0), calculatedIdle, 0);
+  const decay = getDecayMetrics(liveMinutesIdle);
+  const status = statusConfig[decay.phase] || statusConfig.fresh;
   const screenshotSrc = link.screenshot ? `${SERVER_URL}${link.screenshot}` : null;
+
+  const cardVisualStyle = {
+    '--decay-opacity': `${Math.max(0.45, 1 - decay.progress * 0.42)}`,
+    opacity: 'var(--decay-opacity)',
+    filter: `grayscale(${Math.round(decay.progress * 85)}%)`,
+    transform: `scale(${(1 - decay.progress * 0.05).toFixed(3)})`,
+    animation: decay.phase === 'fresh' ? 'none' : decay.phase === 'aging' ? 'decayFade 3.6s ease-in-out infinite alternate' : 'decayFade 2.2s ease-in-out infinite alternate',
+    transition: 'opacity 320ms linear, filter 320ms linear, transform 320ms ease',
+  };
 
   const clearCloseTimer = () => {
     if (closeTimerRef.current) {
@@ -94,6 +128,13 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
   useEffect(() => {
     setSuggestions(link.suggestions || []);
   }, [link.suggestions]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setTick(Date.now());
+    }, 20_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   // Listen for real-time reaction updates on this link
   useEffect(() => {
@@ -234,8 +275,8 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
           bg-white/45 backdrop-blur-xl border border-white/60
           shadow-lg hover:shadow-xl hover:-translate-y-1
           transition-all duration-300 cursor-pointer group
-          ${activePopover ? 'z-[120]' : 'z-0'}
-          ${getDecayStyle(link.status)}`}
+          ${activePopover ? 'z-[120]' : 'z-0'}`}
+        style={cardVisualStyle}
         onClick={() => setShowDetail(true)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -269,8 +310,8 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
           </p>
 
           {/* Revival hint */}
-          {(link.status === 'aging' || link.status === 'dead') && (
-            <p className="text-xs text-emerald-600 italic">⚠ Click "Open" to revive this link</p>
+          {(decay.phase === 'aging' || decay.phase === 'dead') && (
+            <p className="text-xs text-emerald-600 italic">⚠ Lifeline fading. Click "Open" to revive this link.</p>
           )}
 
           {/* Vibe Pills */}
@@ -302,7 +343,7 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
                 {status.label}
               </span>
               <span className="text-xs text-[#6B7280]">
-                {link.minutesIdle < 1 ? 'Just added' : `Idle ${link.minutesIdle}m`}
+                {liveMinutesIdle < 1 ? 'Just added' : `Idle ${liveMinutesIdle}m`}
               </span>
             </div>
             <div className="flex items-center gap-3">
