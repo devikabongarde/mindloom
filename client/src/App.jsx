@@ -7,6 +7,8 @@ import Register from './pages/Register';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Shelf from './pages/Shelf';
+import Social from './pages/Social';
+import Notifications from './pages/Notifications';
 import CompostHeap from './pages/CompostHeap';
 import Profile from './pages/Profile';
 import AcceptInvite from './pages/AcceptInvite';
@@ -84,6 +86,8 @@ function AppRoutes() {
       <Route path="/dashboard"      element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/shelf"          element={<ProtectedRoute><ShelfRedirect /></ProtectedRoute>} />
       <Route path="/shelf/:id"      element={<ProtectedRoute><Shelf /></ProtectedRoute>} />
+      <Route path="/social"         element={<ProtectedRoute><Social /></ProtectedRoute>} />
+      <Route path="/notifications"  element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/compost"        element={<ProtectedRoute><CompostHeap /></ProtectedRoute>} />
       <Route path="/profile"        element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/invite/:token"  element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />

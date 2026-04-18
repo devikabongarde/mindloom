@@ -7,6 +7,7 @@ const shelfSchema = new mongoose.Schema(
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     parentShelfId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shelf', default: null },
     isPublic: { type: Boolean, default: false },
+    starredBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     type: { type: String, enum: ['personal', 'team'], default: 'personal' },
     weather: {
       type: String,

@@ -8,6 +8,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/auth.routes.js';
 import shelfRoutes from './routes/shelf.routes.js';
 import linkRoutes from './routes/link.routes.js';
+import socialRoutes from './routes/social.routes.js';
 
 const REALTIME_ENABLED = process.env.REALTIME_ENABLED === "true";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +42,7 @@ app.use('/static', express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api/shelves', shelfRoutes);
 app.use('/api/links', linkRoutes);
+app.use('/api/social', socialRoutes);
 app.get('/', (req, res) => res.json({ message: 'SHELFLIFE API running' }));
 
 // Socket.IO event handlers

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Bell, Search, UserCircle2 } from 'lucide-react';
+import { ArrowUpRight, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../utils/api';
 
@@ -23,7 +23,10 @@ const cardVariants = {
 export default function Dashboard() {
   const { user } = useAuth();
   const firstName = user?.name ? user.name.split(' ')[0] : 'there';
-  const shelfState = user?.defaultShelfId ? 'Active shelf ready' : 'Set up your default shelf';
+  const [allShelfIds, setAllShelfIds] = useState([]);
+  const [shelfNameById, setShelfNameById] = useState({});
+  const [shelfIsForkedById, setShelfIsForkedById] = useState({});
+  const shelfState = allShelfIds.length > 0 ? 'Shelves synced' : 'Set up your first shelf';
   const [now, setNow] = useState(new Date());
   const [dashboardLinks, setDashboardLinks] = useState([]);
   const [linksLoading, setLinksLoading] = useState(false);
@@ -38,7 +41,38 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!user?.defaultShelfId) {
+    let cancelled = false;
+
+    const loadShelves = async () => {
+      if (!user) {
+        setAllShelfIds([]);
+        return;
+      }
+
+      try {
+        const { data } = await api.get('/api/shelves/mine');
+        const shelves = Array.isArray(data) ? data : [];
+        if (cancelled) return;
+        setAllShelfIds(shelves.map((s) => s._id));
+        setShelfNameById(Object.fromEntries(shelves.map((s) => [String(s._id), s.name])));
+        setShelfIsForkedById(Object.fromEntries(shelves.map((s) => [String(s._id), Boolean(s.parentShelfId)])));
+      } catch {
+        if (!cancelled) {
+          setAllShelfIds([]);
+          setShelfNameById({});
+          setShelfIsForkedById({});
+        }
+      }
+    };
+
+    loadShelves();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (allShelfIds.length === 0) {
       setDashboardLinks([]);
       return;
     }
@@ -46,9 +80,18 @@ export default function Dashboard() {
     let cancelled = false;
     setLinksLoading(true);
 
-    api.get(`/api/links/shelf/${user.defaultShelfId}`)
-      .then(({ data }) => {
-        if (!cancelled) setDashboardLinks(Array.isArray(data) ? data : []);
+    Promise.all(
+      allShelfIds.map((id) =>
+        api.get(`/api/links/shelf/${id}`)
+          .then(({ data }) => (Array.isArray(data) ? data : []))
+          .catch(() => [])
+      )
+    )
+      .then((resultSets) => {
+        if (cancelled) return;
+        const merged = resultSets.flat();
+        const deduped = [...new Map(merged.map((link) => [String(link._id), link])).values()];
+        setDashboardLinks(deduped);
       })
       .catch(() => {
         if (!cancelled) setDashboardLinks([]);
@@ -60,10 +103,14 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [user?.defaultShelfId]);
+  }, [allShelfIds]);
 
   useEffect(() => {
-    if (!user?.defaultShelfId) return;
+    if (allShelfIds.length === 0) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
 
     const query = searchQuery.trim();
     if (!query) {
@@ -76,29 +123,46 @@ export default function Dashboard() {
     setSearchLoading(true);
 
     const timer = window.setTimeout(() => {
-      api.get('/api/links/search', {
-        params: {
-          shelfId: user.defaultShelfId,
-          q: query,
-          limit: 6,
-        },
-      })
-        .then(({ data }) => {
-          if (!cancelled) setSearchResults(Array.isArray(data) ? data : []);
+      const normalizedQuery = query.toLowerCase();
+      const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+
+      const scored = dashboardLinks
+        .map((link) => {
+          const haystack = [
+            link.title || '',
+            link.summary || '',
+            link.url || '',
+            Array.isArray(link.vibes) ? link.vibes.join(' ') : '',
+          ].join(' ').toLowerCase();
+
+          let score = 0;
+          if (haystack.includes(normalizedQuery)) score += 4;
+          tokens.forEach((token) => {
+            if (haystack.includes(token)) score += 1;
+          });
+
+          return {
+            link,
+            score,
+            recency: toTime(link.lastClickedAt || link.createdAt),
+          };
         })
-        .catch(() => {
-          if (!cancelled) setSearchResults([]);
-        })
-        .finally(() => {
-          if (!cancelled) setSearchLoading(false);
-        });
+        .filter((item) => item.score > 0)
+        .sort((a, b) => (b.score - a.score) || (b.recency - a.recency))
+        .slice(0, 6)
+        .map((item) => item.link);
+
+      if (!cancelled) {
+        setSearchResults(scored);
+        setSearchLoading(false);
+      }
     }, 260);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [searchQuery, user?.defaultShelfId]);
+  }, [searchQuery, allShelfIds, dashboardLinks]);
 
   const hour = now.getHours();
   const greeting =
@@ -110,12 +174,17 @@ export default function Dashboard() {
           ? 'Good evening'
           : 'Good night';
 
+  const toTime = (value) => {
+    const ts = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(ts) ? ts : 0;
+  };
+
   const hotLinks = [...dashboardLinks]
-    .sort((a, b) => new Date(b.lastClickedAt) - new Date(a.lastClickedAt))
+    .sort((a, b) => toTime(b.lastClickedAt || b.createdAt) - toTime(a.lastClickedAt || a.createdAt))
     .slice(0, 3);
 
   const recentLinks = [...dashboardLinks]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .sort((a, b) => toTime(b.createdAt || b.lastClickedAt) - toTime(a.createdAt || a.lastClickedAt))
     .slice(0, 3);
 
   const formatMinutesIdle = (minutesIdle) => {
@@ -222,7 +291,9 @@ export default function Dashboard() {
                         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#F4845F] bg-[#F4845F]/10 border border-[#F4845F]/20 rounded-full px-2 py-1">Most visited</span>
                       </div>
                       <div className="flex flex-col gap-2">
-                        {hotLinks.map((item, index) => (
+                        {hotLinks.length === 0 ? (
+                          <p className="text-xs theme-muted">No activity yet. Open a few links and they will appear here.</p>
+                        ) : hotLinks.map((item, index) => (
                           <motion.a
                             key={`hot-${item._id}`}
                             href={item.url}
@@ -240,7 +311,17 @@ export default function Dashboard() {
                                 <p className="text-xs theme-muted truncate">{getDomain(item.url)} · active {formatMinutesIdle(item.minutesIdle)}</p>
                               </div>
                             </div>
-                            <ArrowUpRight size={15} className="text-[#F4845F] flex-shrink-0" />
+                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f7498] bg-white/70 border border-white/80 rounded-full px-2 py-0.5">
+                                {shelfNameById[String(item.shelfId)] || 'Unknown shelf'}
+                              </span>
+                              {shelfIsForkedById[String(item.shelfId)] && (
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#F4845F] bg-[#F4845F]/10 border border-[#F4845F]/20 rounded-full px-2 py-0.5">
+                                  Forked
+                                </span>
+                              )}
+                              <ArrowUpRight size={15} className="text-[#F4845F]" />
+                            </div>
                           </motion.a>
                         ))}
                       </div>
@@ -252,7 +333,9 @@ export default function Dashboard() {
                         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5f7498] bg-white/60 border border-white/70 rounded-full px-2 py-1">Latest saved</span>
                       </div>
                       <div className="flex flex-col gap-2">
-                        {recentLinks.map((item) => (
+                        {recentLinks.length === 0 ? (
+                          <p className="text-xs theme-muted">No links added yet. Save links to see recent activity.</p>
+                        ) : recentLinks.map((item) => (
                           <motion.a
                             key={`recent-${item._id}`}
                             href={item.url}
@@ -270,7 +353,17 @@ export default function Dashboard() {
                                 <p className="text-xs theme-muted truncate">{getDomain(item.url)} · added {new Date(item.createdAt).toLocaleDateString()}</p>
                               </div>
                             </div>
-                            <ArrowUpRight size={15} className="text-[#F4845F] flex-shrink-0" />
+                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f7498] bg-white/70 border border-white/80 rounded-full px-2 py-0.5">
+                                {shelfNameById[String(item.shelfId)] || 'Unknown shelf'}
+                              </span>
+                              {shelfIsForkedById[String(item.shelfId)] && (
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#F4845F] bg-[#F4845F]/10 border border-[#F4845F]/20 rounded-full px-2 py-0.5">
+                                  Forked
+                                </span>
+                              )}
+                              <ArrowUpRight size={15} className="text-[#F4845F]" />
+                            </div>
                           </motion.a>
                         ))}
                       </div>
@@ -315,7 +408,7 @@ export default function Dashboard() {
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A] opacity-90" />
                 <div>
                   <p className="text-sm font-semibold text-[#20314d]">{shelfState}</p>
-                  <p className="text-xs theme-muted">{user?.defaultShelfId ? 'Ready for new links' : 'Choose a default shelf in your setup flow'}</p>
+                  <p className="text-xs theme-muted">{allShelfIds.length > 0 ? 'Insights across all your shelves' : 'Create a shelf to unlock insights'}</p>
                 </div>
               </div>
             </motion.section>
@@ -372,16 +465,10 @@ export default function Dashboard() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => setSearchOpen(true)}
-                      placeholder="Semantic search your shelf…"
+                      placeholder="Search across all your shelves…"
                       className="bg-transparent outline-none border-none w-full text-sm text-[#20314d] placeholder:text-[#8aa0c1]"
                     />
                   </div>
-                  <button className="w-11 h-11 rounded-full bg-white/70 border border-white/70 flex items-center justify-center text-[#20314d]">
-                    <Bell size={18} />
-                  </button>
-                  <button className="w-11 h-11 rounded-full bg-white/70 border border-white/70 flex items-center justify-center text-[#20314d]">
-                    <UserCircle2 size={18} />
-                  </button>
                 </div>
 
                 {searchOpen && searchQuery.trim() && (
@@ -429,8 +516,8 @@ export default function Dashboard() {
                     <ArrowUpRight size={20} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-[#20314d]">{user?.defaultShelfId ? 'Shelf ready' : 'Shelf setup needed'}</p>
-                    <p className="text-xs theme-muted">{user?.defaultShelfId ? 'Your default shelf is connected.' : 'Pick a shelf to unlock this view.'}</p>
+                    <p className="text-sm font-semibold text-[#20314d]">{allShelfIds.length > 0 ? 'Shelves ready' : 'Shelf setup needed'}</p>
+                    <p className="text-xs theme-muted">{allShelfIds.length > 0 ? 'Using all your shelves for dashboard insights.' : 'Create your first shelf to unlock this view.'}</p>
                   </div>
                 </div>
 

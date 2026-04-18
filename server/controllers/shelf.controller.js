@@ -1,7 +1,9 @@
 import crypto from 'crypto';
+import Notification from '../models/Notification.js';
 import Shelf from '../models/Shelf.js';
 import Link from '../models/Link.js';
 import ShelfInvite from '../models/ShelfInvite.js';
+import User from '../models/User.js';
 
 // POST /api/shelves/team
 export const createTeamShelf = async (req, res) => {
@@ -101,6 +103,19 @@ export const forkShelf = async (req, res) => {
       await Link.insertMany(newLinks);
     }
 
+    if (String(source.ownerId) !== String(req.user.id)) {
+      const actor = await User.findById(req.user.id).select('name').lean();
+      await Notification.create({
+        userId: source.ownerId,
+        actorId: req.user.id,
+        type: 'shelf_forked',
+        title: 'Your shelf was forked',
+        message: `${actor?.name || 'Someone'} forked "${source.name}"`,
+        meta: { sourceShelfId: source._id, forkedShelfId: forked._id },
+        isRead: false,
+      });
+    }
+
     res.status(201).json(forked);
   } catch (err) {
     console.error('forkShelf error:', err.message);
@@ -136,5 +151,90 @@ export const getShelfLineage = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error getting lineage' });
+  }
+};
+
+// PATCH /api/shelves/:id/visibility
+export const updateShelfVisibility = async (req, res) => {
+  try {
+    const { isPublic } = req.body;
+    if (typeof isPublic !== 'boolean') {
+      return res.status(400).json({ message: 'isPublic (boolean) is required' });
+    }
+
+    const shelf = await Shelf.findById(req.params.id);
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isOwner = String(shelf.ownerId) === String(req.user.id);
+    if (!isOwner) return res.status(403).json({ message: 'Only the shelf owner can change visibility' });
+
+    shelf.isPublic = isPublic;
+    await shelf.save();
+
+    res.json({ _id: shelf._id, isPublic: shelf.isPublic });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error updating shelf visibility' });
+  }
+};
+
+// DELETE /api/shelves/:id
+export const deleteShelf = async (req, res) => {
+  try {
+    const shelf = await Shelf.findById(req.params.id);
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isOwner = String(shelf.ownerId) === String(req.user.id);
+    if (!isOwner) return res.status(403).json({ message: 'Only the shelf owner can delete this shelf' });
+
+    await Promise.all([
+      Link.deleteMany({ shelfId: shelf._id }),
+      ShelfInvite.deleteMany({ shelfId: shelf._id }),
+      Shelf.updateMany({ parentShelfId: shelf._id }, { $set: { parentShelfId: null } }),
+      User.updateMany({ defaultShelfId: shelf._id }, { $set: { defaultShelfId: null } }),
+    ]);
+
+    await Shelf.deleteOne({ _id: shelf._id });
+    res.json({ _id: shelf._id, deleted: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error deleting shelf' });
+  }
+};
+
+// POST /api/shelves/:id/star
+export const toggleShelfStar = async (req, res) => {
+  try {
+    const shelf = await Shelf.findById(req.params.id);
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const userId = String(req.user.id);
+    const starredBy = (shelf.starredBy || []).map(String);
+    const hasStarred = starredBy.includes(userId);
+
+    shelf.starredBy = hasStarred
+      ? (shelf.starredBy || []).filter((id) => String(id) !== userId)
+      : [...new Set([...(shelf.starredBy || []).map(String), userId])];
+
+    await shelf.save();
+
+    if (!hasStarred && String(shelf.ownerId) !== userId) {
+      const actor = await User.findById(req.user.id).select('name').lean();
+      await Notification.create({
+        userId: shelf.ownerId,
+        actorId: req.user.id,
+        type: 'shelf_starred',
+        title: 'Your shelf got a star',
+        message: `${actor?.name || 'Someone'} starred "${shelf.name}"`,
+        meta: { shelfId: shelf._id },
+        isRead: false,
+      });
+    }
+
+    res.json({
+      _id: shelf._id,
+      starred: !hasStarred,
+      starCount: (shelf.starredBy || []).length,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error updating shelf star' });
   }
 };

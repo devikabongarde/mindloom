@@ -1,10 +1,14 @@
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, BookOpen, Trash2, User, LogOut } from 'lucide-react';
+import { Home, BookOpen, Trash2, User, Users, Bell, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 
 const navItems = [
   { to: '/dashboard', icon: Home,     label: 'Dashboard'    },
   { to: '/shelf',     icon: BookOpen, label: 'My Shelf'     },
+  { to: '/social',    icon: Users,    label: 'Social'       },
+  { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/compost',   icon: Trash2,   label: 'Compost Heap' },
   { to: '/profile',   icon: User,     label: 'Profile'      },
 ];
@@ -12,6 +16,28 @@ const navItems = [
 export default function Sidebar() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data } = await api.get('/api/social/notifications', { params: { limit: 20 } });
+        if (!cancelled) setUnreadCount(Number(data?.unreadCount || 0));
+      } catch {
+        if (!cancelled) setUnreadCount(0);
+      }
+    };
+
+    loadUnreadCount();
+    const intervalId = window.setInterval(loadUnreadCount, 30_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -46,7 +72,12 @@ export default function Sidebar() {
               }
             >
               <Icon size={18} />
-              {label}
+              <span className="flex-1">{label}</span>
+              {to === '/notifications' && unreadCount > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[#F4845F] text-white text-[11px] font-bold inline-flex items-center justify-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

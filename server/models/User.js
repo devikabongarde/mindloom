@@ -15,6 +15,9 @@ const userSchema = new mongoose.Schema(
       HighSignal: { type: Number, default: 0 },
       Inspirational: { type: Number, default: 0 },
     },
+    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    friendRequestsSent: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    friendRequestsReceived: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true }
 );

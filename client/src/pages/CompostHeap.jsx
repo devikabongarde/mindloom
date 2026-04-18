@@ -7,14 +7,65 @@ import api from '../utils/api';
 export default function CompostHeap() {
   const { user } = useAuth();
   const [dead, setDead] = useState([]);
+  const [shelfNameById, setShelfNameById] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.defaultShelfId) return;
-    api.get(`/api/links/compost/${user.defaultShelfId}`)
-      .then(({ data }) => setDead(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const loadCompost = async () => {
+      if (!user) {
+        setDead([]);
+        setShelfNameById({});
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const { data: shelvesData } = await api.get('/api/shelves/mine');
+        const shelves = Array.isArray(shelvesData) ? shelvesData : [];
+
+        if (cancelled) return;
+
+        if (shelves.length === 0) {
+          setDead([]);
+          setShelfNameById({});
+          return;
+        }
+
+        const nameMap = Object.fromEntries(shelves.map((s) => [String(s._id), s.name]));
+        setShelfNameById(nameMap);
+
+        const results = await Promise.all(
+          shelves.map((shelf) =>
+            api.get(`/api/links/compost/${shelf._id}`)
+              .then(({ data }) => (Array.isArray(data) ? data : []))
+              .catch(() => [])
+          )
+        );
+
+        if (cancelled) return;
+
+        const merged = results.flat();
+        const deduped = [...new Map(merged.map((link) => [String(link._id), link])).values()]
+          .sort((a, b) => (b.minutesIdle || 0) - (a.minutesIdle || 0));
+
+        setDead(deduped);
+      } catch {
+        if (!cancelled) {
+          setDead([]);
+          setShelfNameById({});
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadCompost();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const handleRevive = async (link) => {
@@ -34,7 +85,7 @@ export default function CompostHeap() {
 
         <p className="theme-muted text-sm max-w-xl leading-relaxed">
           These links were neglected for too long and have decomposed.
-          Click <strong>Revive</strong> to pull one back from the dead — or let them rot forever.
+          Click <strong className="text-emerald-600">Revive</strong> to pull one back from the dead — or let them rot forever.
         </p>
 
         {loading ? (
@@ -59,12 +110,13 @@ export default function CompostHeap() {
                 </p>
                 <VibePills vibes={link.vibes} />
                 <div className="flex items-center justify-between mt-auto pt-2 border-t border-white/30">
-                  <span className="text-xs theme-muted italic">
-                    Idle {link.minutesIdle}m · {link.addedBy?.name || 'Unknown'}
-                  </span>
+                  <div className="text-xs theme-muted italic flex flex-col">
+                    <span>Idle {link.minutesIdle}m · {link.addedBy?.name || 'Unknown'}</span>
+                    <span>{shelfNameById[String(link.shelfId)] || 'Unknown shelf'}</span>
+                  </div>
                   <button
                     onClick={() => handleRevive(link)}
-                    className="text-xs font-semibold text-[#F4845F] hover:underline"
+                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
                   >
                     ⚡ Revive
                   </button>

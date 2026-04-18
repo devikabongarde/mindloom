@@ -8,6 +8,9 @@ import {
   acceptShelfInvite,
   forkShelf,
   getShelfLineage,
+  updateShelfVisibility,
+  toggleShelfStar,
+  deleteShelf,
 } from '../controllers/shelf.controller.js';
 
 const router = Router();
@@ -18,6 +21,9 @@ router.get('/mine',           authMiddleware, getMyShelves);
 router.post('/invite',        authMiddleware, inviteMemberToShelf);
 router.post('/invite/accept', authMiddleware, acceptShelfInvite);
 router.post('/fork',          authMiddleware, forkShelf);
+router.post('/:id/star',       authMiddleware, toggleShelfStar);
+router.patch('/:id/visibility', authMiddleware, updateShelfVisibility);
+router.delete('/:id',           authMiddleware, deleteShelf);
 
 // Parameterized routes
 router.get('/:id/lineage',    authMiddleware, getShelfLineage);

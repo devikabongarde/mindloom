@@ -14,7 +14,7 @@ function getDecayStyle(status) {
   return 'opacity-100';
 }
 
-export default function LinkCard({ link }) {
+export default function LinkCard({ link, canDelete = false, onDelete = null }) {
   const [showDetail, setShowDetail]   = useState(false);
   const [reactions, setReactions]     = useState(link.reactions || []);
   const status = statusConfig[link.status] || statusConfig.fresh;
@@ -87,7 +87,7 @@ export default function LinkCard({ link }) {
 
           {/* Revival hint */}
           {(link.status === 'aging' || link.status === 'dead') && (
-            <p className="text-xs text-amber-500 italic">⚠ Click "Open" to revive this link</p>
+            <p className="text-xs text-emerald-600 italic">⚠ Click "Open" to revive this link</p>
           )}
 
           {/* Vibe Pills */}
@@ -141,6 +141,17 @@ export default function LinkCard({ link }) {
               >
                 Open →
               </button>
+              {canDelete && typeof onDelete === 'function' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  className="text-xs font-semibold text-[#cc3d3d] hover:underline"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </div>
         </div>

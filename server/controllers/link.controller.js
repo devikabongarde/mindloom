@@ -1,4 +1,5 @@
 import Link from '../models/Link.js';
+import Shelf from '../models/Shelf.js';
 import User from '../models/User.js';
 import { enrichUrlWithAI, classifyVibes } from '../services/ai.service.js';
 
@@ -304,5 +305,26 @@ export const reactToLink = async (req, res) => {
     res.json({ reactions: link.reactions });
   } catch (err) {
     res.status(500).json({ message: 'Server error reacting to link' });
+  }
+};
+
+// DELETE /api/links/:id
+export const deleteLink = async (req, res) => {
+  try {
+    const link = await Link.findById(req.params.id);
+    if (!link) return res.status(404).json({ message: 'Link not found' });
+
+    const shelf = await Shelf.findById(link.shelfId).select('ownerId');
+    const isShelfOwner = String(shelf?.ownerId || '') === String(req.user.id);
+    const isLinkCreator = String(link.addedBy) === String(req.user.id);
+
+    if (!isShelfOwner && !isLinkCreator) {
+      return res.status(403).json({ message: 'Only the shelf owner or link creator can delete this link' });
+    }
+
+    await Link.deleteOne({ _id: link._id });
+    res.json({ _id: link._id, deleted: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error deleting link' });
   }
 };
