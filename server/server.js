@@ -74,8 +74,8 @@ if (REALTIME_ENABLED && io) {
       }
     });
 
-    socket.on('cursor-move', ({ shelfId, x, y, userName }) => {
-      socket.to(shelfId).emit('cursor-update', { socketId: socket.id, userName, x, y });
+    socket.on('cursor-move', ({ shelfId, x, y, userName, userId }) => {
+      socket.to(shelfId).emit('cursor-update', { socketId: socket.id, userName, userId, x, y });
     });
 
     socket.on('disconnect', () => {
