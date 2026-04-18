@@ -80,49 +80,45 @@ export default function Shelf() {
   return (
     <Layout>
       <div className="flex flex-col gap-8">
-        {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[#1A1A2E]">
+            <h1 className="theme-hero-title text-3xl font-bold">
               {shelfData ? shelfData.name : 'Loading shelf…'}
             </h1>
             {user?.curatorArchetype && (
-              <p className="text-xs text-[#6B7280] mt-1">
+              <p className="text-xs theme-muted mt-1">
                 You are a <span className="font-semibold">{user.curatorArchetype.name}</span>.
               </p>
             )}
             {activeUsers.length > 0 && (
-              <p className="text-xs text-[#6B7280] mt-0.5 italic">
+              <p className="text-xs theme-muted mt-0.5 italic">
                 Live now: {activeUsers.join(', ')}
               </p>
             )}
           </div>
 
-          {/* Right side controls */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <ShelfSwitcher />
             {isOwner && (
               <button
                 onClick={() => setShowShare(true)}
-                className="text-xs font-semibold text-[#F4845F] bg-white/70 border border-white/80 rounded-full px-3 py-1.5 hover:bg-white transition"
+                className="theme-button-secondary text-xs font-semibold rounded-full px-3 py-1.5 transition"
               >
                 Share shelf
               </button>
             )}
-            <span className="text-sm font-medium text-[#6B7280] bg-white/50 border border-white/60 rounded-full px-4 py-1.5 backdrop-blur">
+            <span className="text-sm font-medium theme-muted bg-white/50 border border-white/60 rounded-full px-4 py-1.5 backdrop-blur">
               {weather}
             </span>
           </div>
         </div>
 
-        {/* URL Input */}
         <LinkInputBar shelfId={shelfId} onLinkCreated={handleNewLink} />
 
-        {/* Link Grid */}
         {loading ? (
-          <p className="text-[#6B7280] text-center mt-12">Loading your shelf…</p>
+          <p className="theme-muted text-center mt-12">Loading your shelf…</p>
         ) : links.length === 0 ? (
-          <p className="text-[#6B7280] text-center mt-12">
+          <p className="theme-muted text-center mt-12">
             Your shelf is empty. Drop a link above to bring it to life. 🌱
           </p>
         ) : (
@@ -132,7 +128,6 @@ export default function Shelf() {
         )}
       </div>
 
-      {/* Share Modal */}
       {showShare && (
         <ShareShelfModal shelfId={shelfId} onClose={() => setShowShare(false)} />
       )}

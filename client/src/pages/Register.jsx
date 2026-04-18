@@ -28,21 +28,18 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FFD6E0] via-[#C9B8FF] to-[#B8F0E0]">
-      <div
-        className="w-full max-w-[420px] mx-4 p-10 rounded-[20px] shadow-[0_20px_40px_rgba(26,26,46,0.1)]"
-        style={{ backdropFilter: 'blur(20px)', background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.6)' }}
-      >
-        {/* Logo */}
+    <div className="theme-shell min-h-screen flex items-center justify-center px-4 py-10">
+      <div className="theme-card w-full max-w-[420px] mx-4 p-10 rounded-[24px] shadow-[0_20px_40px_rgba(26,26,46,0.1)]">
+        <div className="theme-card-content">
         <div className="flex items-center gap-2 mb-6">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A] shadow-lg shadow-[#F4845F]/40" />
-          <span className="font-bold text-lg bg-gradient-to-r from-[#F4845F] to-[#E8617A] bg-clip-text text-transparent">
+          <span className="font-bold text-lg bg-gradient-to-r from-[#F4845F] to-[#E8617A] bg-clip-text text-transparent font-['Sora']">
             SHELFLIFE
           </span>
         </div>
 
-        <h1 className="text-2xl font-bold text-[#1A1A2E] mb-1">Create your archive</h1>
-        <p className="text-sm text-[#6B7280] mb-6">Start curating what matters</p>
+        <h1 className="theme-hero-title text-2xl font-bold mb-1">Create your archive</h1>
+        <p className="theme-muted text-sm mb-6">Start curating what matters</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
@@ -52,7 +49,7 @@ export default function Register() {
             value={form.name}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] bg-white/70 text-[#1A1A2E] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#F4845F]/40 text-sm"
+            className="theme-input w-full px-4 py-3 rounded-xl text-sm"
           />
           <input
             name="email"
@@ -61,7 +58,7 @@ export default function Register() {
             value={form.email}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] bg-white/70 text-[#1A1A2E] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#F4845F]/40 text-sm"
+            className="theme-input w-full px-4 py-3 rounded-xl text-sm"
           />
           <input
             name="password"
@@ -70,7 +67,7 @@ export default function Register() {
             value={form.password}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] bg-white/70 text-[#1A1A2E] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#F4845F]/40 text-sm"
+            className="theme-input w-full px-4 py-3 rounded-xl text-sm"
           />
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -78,16 +75,17 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#F4845F] to-[#E8617A] hover:opacity-90 transition-opacity disabled:opacity-60"
+            className="theme-button w-full py-3 rounded-xl font-semibold transition-opacity disabled:opacity-60"
           >
             {loading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
 
-        <p className="text-sm text-[#6B7280] text-center mt-5">
+        <p className="text-sm text-center mt-5 theme-muted">
           Already have an account?{' '}
           <Link to="/login" className="text-[#F4845F] font-medium hover:text-[#E8617A]">Sign in</Link>
         </p>
+        </div>
       </div>
     </div>
   );

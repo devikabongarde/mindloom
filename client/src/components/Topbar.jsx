@@ -1,20 +1,19 @@
-import { Bell } from 'lucide-react';
+import { UserCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Topbar() {
   const { user } = useAuth();
-  const initials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : '?';
+  const navigate = useNavigate();
 
   return (
-    <header className="flex items-center justify-end gap-4 px-6 py-4">
-      <button className="relative text-[#6B7280] hover:text-[#1A1A2E] transition-colors">
-        <Bell size={20} />
-      </button>
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A] flex items-center justify-center text-white text-sm font-bold shadow-md">
-        {initials}
-      </div>
-    </header>
+    <button
+      type="button"
+      onClick={() => navigate('/profile')}
+      aria-label={user?.name ? `Open profile for ${user.name}` : 'Open profile'}
+      className="fixed right-6 top-8 z-[20] w-11 h-11 rounded-full bg-white/70 border border-white/80 shadow-[0_12px_28px_rgba(120,141,183,0.16)] backdrop-blur-xl flex items-center justify-center text-[#20314d] hover:scale-105 transition-transform"
+    >
+      <UserCircle2 size={22} />
+    </button>
   );
 }

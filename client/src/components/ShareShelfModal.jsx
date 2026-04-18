@@ -35,18 +35,19 @@ export default function ShareShelfModal({ shelfId, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-white/85 backdrop-blur-xl rounded-3xl p-6 w-full max-w-md shadow-2xl border border-white/70"
+        className="theme-modal rounded-3xl p-6 w-full max-w-md shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-bold text-[#1A1A2E] mb-1">Share this Shelf</h2>
-        <p className="text-xs text-[#6B7280] mb-4 leading-relaxed">
+        <div className="theme-modal-content">
+        <h2 className="text-lg font-bold mb-1">Share this Shelf</h2>
+        <p className="text-xs theme-muted mb-4 leading-relaxed">
           Invite a teammate by email. We'll generate a magic link you can paste in chat.
         </p>
 
         <form onSubmit={handleInvite} className="flex flex-col gap-3">
           <input
             type="email"
-            className="w-full rounded-2xl border border-white/80 bg-white/60 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#F4845F] placeholder:text-[#6B7280]"
+            className="theme-input w-full rounded-2xl px-4 py-2.5 text-sm"
             placeholder="teammate@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -56,7 +57,7 @@ export default function ShareShelfModal({ shelfId, onClose }) {
           <button
             type="submit"
             disabled={loading}
-            className="bg-gradient-to-r from-[#F4845F] to-[#E8617A] text-white text-sm font-semibold px-4 py-2.5 rounded-2xl hover:opacity-90 transition disabled:opacity-60"
+            className="theme-button text-sm font-semibold px-4 py-2.5 rounded-2xl hover:opacity-90 transition disabled:opacity-60"
           >
             {loading ? 'Generating…' : 'Generate invite link'}
           </button>
@@ -65,9 +66,9 @@ export default function ShareShelfModal({ shelfId, onClose }) {
 
         {inviteUrl && (
           <div className="mt-4">
-            <p className="text-xs text-[#6B7280] mb-1 font-medium">Invite link (share this):</p>
-            <div className="flex items-center gap-2 bg-white/90 rounded-2xl px-3 py-2 border border-white/60">
-              <p className="text-xs text-[#1A1A2E] break-all flex-1">{inviteUrl}</p>
+            <p className="text-xs theme-muted mb-1 font-medium">Invite link (share this):</p>
+            <div className="flex items-center gap-2 bg-white/75 rounded-2xl px-3 py-2 border border-white/60">
+              <p className="text-xs break-all flex-1">{inviteUrl}</p>
               <button
                 onClick={handleCopy}
                 className="text-xs font-semibold text-[#F4845F] whitespace-nowrap hover:underline flex-shrink-0"
@@ -80,10 +81,11 @@ export default function ShareShelfModal({ shelfId, onClose }) {
 
         <button
           onClick={onClose}
-          className="mt-4 text-xs text-[#6B7280] hover:text-[#1A1A2E] transition"
+          className="mt-4 text-xs theme-muted hover:text-[#1A1A2E] transition"
         >
           ← Close
         </button>
+        </div>
       </div>
     </div>
   );

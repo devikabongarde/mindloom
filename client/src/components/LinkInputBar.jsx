@@ -26,24 +26,22 @@ export default function LinkInputBar({ shelfId, onLinkCreated }) {
     <div className="relative w-full max-w-2xl mx-auto">
       <form
         onSubmit={handleSubmit}
-        className="flex items-center gap-3
-          bg-white/45 backdrop-blur-xl border border-white/60
-          rounded-full shadow-md px-5 py-3"
+        className="theme-panel flex items-center gap-3 rounded-full shadow-md px-5 py-3"
       >
-        <span className="text-[#6B7280] text-lg select-none">🔗</span>
+        <span className="theme-muted text-lg select-none">🔗</span>
         <input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Drop a link to resurrect it…"
-          className="flex-1 bg-transparent outline-none text-sm text-[#1A1A2E] placeholder-gray-400"
+          className="flex-1 bg-transparent outline-none text-sm text-[#20314d] placeholder:text-[#8aa0c1]"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading}
-          className="bg-gradient-to-r from-[#F4845F] to-[#E8617A]
-            text-white text-sm font-semibold px-5 py-2
+          className="theme-button
+            text-sm font-semibold px-5 py-2
             rounded-full hover:opacity-90 transition-opacity
             disabled:opacity-50 min-w-[90px] text-center whitespace-nowrap"
         >

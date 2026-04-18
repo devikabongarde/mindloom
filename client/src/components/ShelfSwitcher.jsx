@@ -18,7 +18,7 @@ export default function ShelfSwitcher() {
 
   return (
     <select
-      className="text-xs bg-white/60 border border-white/80 rounded-full px-3 py-1.5 text-[#6B7280] outline-none cursor-pointer backdrop-blur"
+      className="theme-select text-xs rounded-full px-3 py-1.5 theme-muted outline-none cursor-pointer"
       value={currentShelfId || user?.defaultShelfId || ''}
       onChange={(e) => e.target.value && navigate(`/shelf/${e.target.value}`)}
     >

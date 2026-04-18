@@ -27,9 +27,7 @@ export default function LinkCard({ link }) {
   return (
     <>
       <div
-        className={`rounded-[20px] overflow-hidden flex flex-col gap-0
-          bg-white/45 backdrop-blur-xl
-          border border-white/60
+        className={`theme-card rounded-[20px] overflow-hidden flex flex-col gap-0
           shadow-lg hover:shadow-xl
           hover:-translate-y-1 transition-all duration-300
           cursor-pointer group
@@ -48,39 +46,34 @@ export default function LinkCard({ link }) {
         )}
 
         {/* Card content */}
-        <div className="flex flex-col gap-3 p-5">
-          {/* Title */}
-          <h3 className="font-bold text-[#1A1A2E] text-base leading-snug line-clamp-2 group-hover:text-[#F4845F] transition-colors">
+        <div className="theme-card-content flex flex-col gap-3 p-5">
+          <h3 className="font-bold text-base leading-snug line-clamp-2 group-hover:text-[#F4845F] transition-colors">
             {link.title}
           </h3>
 
-          {/* Summary */}
-          <p className="text-[#6B7280] text-sm leading-relaxed line-clamp-3">
+          <p className="theme-muted text-sm leading-relaxed line-clamp-3">
             {link.summary || 'Enriching with AI…'}
           </p>
 
-          {/* Revival hint */}
           {(link.status === 'aging' || link.status === 'dead') && (
             <p className="text-xs text-amber-500 italic">⚠ Click "Open" to revive this link</p>
           )}
 
-          {/* Vibe Pills */}
           <VibePills vibes={link.vibes} />
 
-          {/* Footer */}
           <div className="flex items-center justify-between mt-auto pt-2 border-t border-white/40">
             <div className="flex items-center gap-2">
               <span className={`text-xs font-medium border rounded-full px-2 py-0.5 ${status.border} ${status.text}`}>
                 {status.label}
               </span>
-              <span className="text-xs text-[#6B7280]">
+              <span className="text-xs theme-muted">
                 {link.minutesIdle < 1 ? 'Just added' : `Idle ${link.minutesIdle}m`}
               </span>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowDetail(true)}
-                className="text-xs font-semibold text-[#6B7280] hover:text-[#1A1A2E] transition underline underline-offset-2"
+                className="text-xs font-semibold theme-muted hover:text-[#1A1A2E] transition underline underline-offset-2"
               >
                 Context
               </button>

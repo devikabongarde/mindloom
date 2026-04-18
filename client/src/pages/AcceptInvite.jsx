@@ -21,10 +21,10 @@ export default function AcceptInvite() {
   }, [token, navigate]);
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center px-6">
-      <div className="bg-white/70 backdrop-blur-xl rounded-3xl p-8 text-center shadow-xl border border-white/60 max-w-sm w-full">
+    <div className="theme-shell min-h-screen flex items-center justify-center px-6">
+      <div className="theme-card rounded-3xl p-8 text-center shadow-xl max-w-sm w-full">
         <p className="text-4xl mb-4">{error ? '💀' : '📚'}</p>
-        <p className={`text-sm font-medium ${error ? 'text-red-500' : 'text-[#1A1A2E]'}`}>
+        <p className={`theme-card-content text-sm font-medium ${error ? 'text-red-500' : ''}`}>
           {status}
         </p>
         {error && (
