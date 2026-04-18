@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import LinkInputBar from '../components/LinkInputBar';
 import LinkCard from '../components/LinkCard';
@@ -390,9 +391,11 @@ export default function Shelf() {
                             e.stopPropagation();
                             handleDeleteShelf(shelf._id, shelf.name);
                           }}
-                          className="text-xs font-semibold text-[#cc3d3d] hover:underline"
+                          title="Delete shelf"
+                          aria-label="Delete shelf"
+                          className="text-[#cc3d3d] hover:text-[#a92828] transition"
                         >
-                          Delete
+                          <Trash2 size={14} />
                         </button>
                       )}
                     </div>

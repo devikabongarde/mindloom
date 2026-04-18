@@ -234,7 +234,9 @@ export const createLink = async (req, res) => {
 export const getShelfLinks = async (req, res) => {
   try {
     const links = await Link.find({ shelfId: req.params.id })
-      .sort({ createdAt: -1 }).populate('addedBy', 'name');
+      .sort({ createdAt: -1 })
+      .populate('addedBy', 'name')
+      .populate('suggestions.userId', 'name');
     const enriched = links.map((link) => {
       const l = link.toObject();
       Object.assign(l, computeStatus(l.lastClickedAt));
@@ -326,5 +328,71 @@ export const deleteLink = async (req, res) => {
     res.json({ _id: link._id, deleted: true });
   } catch (err) {
     res.status(500).json({ message: 'Server error deleting link' });
+  }
+};
+
+// GET /api/links/:id/suggestions
+export const getLinkSuggestions = async (req, res) => {
+  try {
+    const link = await Link.findById(req.params.id)
+      .select('suggestions')
+      .populate('suggestions.userId', 'name');
+    if (!link) return res.status(404).json({ message: 'Link not found' });
+
+    const suggestions = (link.suggestions || []).map((item) => ({
+      _id: item._id,
+      text: item.text,
+      createdAt: item.createdAt,
+      user: {
+        _id: item.userId?._id || null,
+        name: item.userId?.name || 'Unknown',
+      },
+    }));
+
+    res.json(suggestions);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error fetching link suggestions' });
+  }
+};
+
+// POST /api/links/:id/suggestions
+export const addLinkSuggestion = async (req, res) => {
+  try {
+    const text = String(req.body?.text || '').trim();
+    if (!text) return res.status(400).json({ message: 'Suggestion text is required' });
+    if (text.length > 300) return res.status(400).json({ message: 'Suggestion must be 300 characters or fewer' });
+
+    const link = await Link.findById(req.params.id).select('shelfId suggestions');
+    if (!link) return res.status(404).json({ message: 'Link not found' });
+
+    link.suggestions.push({ userId: req.user.id, text, createdAt: new Date() });
+    await link.save();
+
+    const fresh = await Link.findById(req.params.id)
+      .select('shelfId suggestions')
+      .populate('suggestions.userId', 'name');
+
+    const latest = fresh.suggestions[fresh.suggestions.length - 1];
+    const payload = {
+      _id: latest._id,
+      text: latest.text,
+      createdAt: latest.createdAt,
+      user: {
+        _id: latest.userId?._id || null,
+        name: latest.userId?.name || 'Unknown',
+      },
+    };
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(String(fresh.shelfId)).emit('suggestion-update', {
+        linkId: req.params.id,
+        suggestion: payload,
+      });
+    }
+
+    res.status(201).json(payload);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error adding suggestion' });
   }
 };

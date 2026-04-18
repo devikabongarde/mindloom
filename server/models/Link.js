@@ -20,6 +20,13 @@ const linkSchema = new mongoose.Schema(
         emoji: { type: String },
       },
     ],
+    suggestions: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        text: { type: String, required: true, trim: true, maxlength: 300 },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     lastClickedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
