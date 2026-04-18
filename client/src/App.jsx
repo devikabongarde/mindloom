@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Shelf from './pages/Shelf';
 import CompostHeap from './pages/CompostHeap';
@@ -38,6 +39,7 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
+      <Route path="/"               element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
       <Route path="/login"          element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/register"       element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
       <Route path="/dashboard"      element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -46,7 +48,7 @@ function AppRoutes() {
       <Route path="/compost"        element={<ProtectedRoute><CompostHeap /></ProtectedRoute>} />
       <Route path="/profile"        element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/invite/:token"  element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
-      <Route path="*"               element={<Navigate to="/dashboard" replace />} />
+      <Route path="*"               element={<Navigate to={user ? '/dashboard' : '/'} replace />} />
     </Routes>
   );
 }
