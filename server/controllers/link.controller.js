@@ -10,6 +10,177 @@ function computeStatus(lastClickedAt) {
   return { status: 'dead', minutesIdle: Math.floor(minutesIdle) };
 }
 
+function normalizeText(value = '') {
+  return String(value)
+    .toLowerCase()
+    .replace(/https?:\/\//g, ' ')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stemToken(token) {
+  if (token.length > 5 && token.endsWith('ing')) return token.slice(0, -3);
+  if (token.length > 4 && token.endsWith('ed')) return token.slice(0, -2);
+  if (token.length > 3 && token.endsWith('s')) return token.slice(0, -1);
+  return token;
+}
+
+function tokenize(value = '') {
+  return normalizeText(value)
+    .split(' ')
+    .map((t) => stemToken(t.trim()))
+    .filter((t) => t.length > 1);
+}
+
+const SYNONYM_MAP = {
+  ai: ['artificial', 'intelligence', 'llm', 'machine', 'learning'],
+  coding: ['programming', 'development', 'software', 'code'],
+  code: ['programming', 'development', 'software', 'coding'],
+  design: ['ux', 'ui', 'interface', 'visual', 'creative'],
+  productivity: ['workflow', 'focus', 'efficiency', 'habit'],
+  startup: ['business', 'product', 'growth', 'founder'],
+  research: ['study', 'paper', 'analysis', 'insight'],
+  tutorial: ['guide', 'howto', 'walkthrough', 'learn'],
+};
+
+function expandQueryTokens(tokens) {
+  const out = new Set(tokens);
+  tokens.forEach((token) => {
+    const related = SYNONYM_MAP[token] || [];
+    related.forEach((r) => out.add(stemToken(r)));
+  });
+  return [...out];
+}
+
+function cosineSimilarity(vecA, vecB) {
+  let dot = 0;
+  let magA = 0;
+  let magB = 0;
+
+  for (const [term, weightA] of vecA.entries()) {
+    const weightB = vecB.get(term) || 0;
+    dot += weightA * weightB;
+    magA += weightA * weightA;
+  }
+
+  for (const weightB of vecB.values()) {
+    magB += weightB * weightB;
+  }
+
+  if (magA === 0 || magB === 0) return 0;
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+function weightedTermVector(linkObj) {
+  const vec = new Map();
+  const add = (tokens, weight) => {
+    tokens.forEach((token) => {
+      vec.set(token, (vec.get(token) || 0) + weight);
+    });
+  };
+
+  add(tokenize(linkObj.title || ''), 3);
+  add(tokenize(linkObj.summary || ''), 2);
+  add(tokenize((linkObj.vibes || []).join(' ')), 2);
+  add(tokenize(linkObj.url || ''), 1);
+  return vec;
+}
+
+function applyIdf(termVec, idfMap) {
+  const out = new Map();
+  for (const [term, tf] of termVec.entries()) {
+    out.set(term, tf * (idfMap.get(term) || 1));
+  }
+  return out;
+}
+
+export const searchShelfLinks = async (req, res) => {
+  try {
+    const { shelfId, q } = req.query;
+    const limit = Math.min(20, Math.max(1, Number.parseInt(req.query.limit || '8', 10)));
+
+    if (!shelfId || !q) {
+      return res.status(400).json({ message: 'shelfId and q are required' });
+    }
+
+    const queryText = String(q).trim();
+    if (!queryText) return res.json([]);
+
+    const links = await Link.find({ shelfId }).sort({ createdAt: -1 }).limit(300).populate('addedBy', 'name');
+    if (links.length === 0) return res.json([]);
+
+    const queryTokens = tokenize(queryText);
+    const expandedQueryTokens = expandQueryTokens(queryTokens);
+    if (expandedQueryTokens.length === 0) return res.json([]);
+
+    const rawLinkVectors = links.map((link) => weightedTermVector(link.toObject()));
+
+    // Build document frequencies for IDF.
+    const df = new Map();
+    rawLinkVectors.forEach((vec) => {
+      for (const term of vec.keys()) {
+        df.set(term, (df.get(term) || 0) + 1);
+      }
+    });
+
+    const docCount = rawLinkVectors.length;
+    const idfMap = new Map();
+    for (const [term, freq] of df.entries()) {
+      idfMap.set(term, Math.log((docCount + 1) / (freq + 1)) + 1);
+    }
+
+    const queryVec = new Map();
+    expandedQueryTokens.forEach((token) => {
+      queryVec.set(token, (queryVec.get(token) || 0) + 1.5);
+    });
+    const weightedQueryVec = applyIdf(queryVec, idfMap);
+
+    const phrase = normalizeText(queryText);
+
+    const scored = links.map((link, index) => {
+      const obj = link.toObject();
+      const vector = applyIdf(rawLinkVectors[index], idfMap);
+      const cosine = cosineSimilarity(weightedQueryVec, vector);
+
+      const titleText = normalizeText(obj.title || '');
+      const summaryText = normalizeText(obj.summary || '');
+      const urlText = normalizeText(obj.url || '');
+
+      let bonus = 0;
+      if (phrase && titleText.includes(phrase)) bonus += 0.28;
+      if (phrase && summaryText.includes(phrase)) bonus += 0.2;
+      if (phrase && urlText.includes(phrase)) bonus += 0.1;
+
+      expandedQueryTokens.forEach((token) => {
+        if (titleText.includes(token)) bonus += 0.03;
+        if (summaryText.includes(token)) bonus += 0.02;
+      });
+
+      const minutesIdle = computeStatus(obj.lastClickedAt).minutesIdle;
+      const recencyBoost = Math.max(0, 0.08 - Math.min(minutesIdle, 240) / 4000);
+
+      const score = cosine + bonus + recencyBoost;
+      return {
+        ...obj,
+        ...computeStatus(obj.lastClickedAt),
+        _score: score,
+      };
+    });
+
+    const result = scored
+      .filter((item) => item._score > 0.06)
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, ...rest }) => rest);
+
+    res.json(result);
+  } catch (err) {
+    console.error('searchShelfLinks error:', err.message);
+    res.status(500).json({ message: 'Server error searching links' });
+  }
+};
+
 export const createLink = async (req, res) => {
   try {
     const { shelfId, url, mode = 'url' } = req.body;

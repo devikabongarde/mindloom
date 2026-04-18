@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Bell, Search, UserCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import api from '../utils/api';
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12, scale: 0.995 },
@@ -24,11 +25,80 @@ export default function Dashboard() {
   const firstName = user?.name ? user.name.split(' ')[0] : 'there';
   const shelfState = user?.defaultShelfId ? 'Active shelf ready' : 'Set up your default shelf';
   const [now, setNow] = useState(new Date());
+  const [dashboardLinks, setDashboardLinks] = useState([]);
+  const [linksLoading, setLinksLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!user?.defaultShelfId) {
+      setDashboardLinks([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLinksLoading(true);
+
+    api.get(`/api/links/shelf/${user.defaultShelfId}`)
+      .then(({ data }) => {
+        if (!cancelled) setDashboardLinks(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setDashboardLinks([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLinksLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.defaultShelfId]);
+
+  useEffect(() => {
+    if (!user?.defaultShelfId) return;
+
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchLoading(true);
+
+    const timer = window.setTimeout(() => {
+      api.get('/api/links/search', {
+        params: {
+          shelfId: user.defaultShelfId,
+          q: query,
+          limit: 6,
+        },
+      })
+        .then(({ data }) => {
+          if (!cancelled) setSearchResults(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearchLoading(false);
+        });
+    }, 260);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery, user?.defaultShelfId]);
 
   const hour = now.getHours();
   const greeting =
@@ -39,6 +109,37 @@ export default function Dashboard() {
         : hour >= 17 && hour < 21
           ? 'Good evening'
           : 'Good night';
+
+  const hotLinks = [...dashboardLinks]
+    .sort((a, b) => new Date(b.lastClickedAt) - new Date(a.lastClickedAt))
+    .slice(0, 3);
+
+  const recentLinks = [...dashboardLinks]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 3);
+
+  const formatMinutesIdle = (minutesIdle) => {
+    if (typeof minutesIdle !== 'number' || Number.isNaN(minutesIdle)) return 'now';
+    if (minutesIdle < 1) return 'now';
+    if (minutesIdle < 60) return `${minutesIdle}m ago`;
+    const hours = Math.floor(minutesIdle / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  const getDomain = (url) => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return 'unknown';
+    }
+  };
+
+  const getInitial = (title, url) => {
+    const seed = (title || url || '?').trim();
+    return seed ? seed.charAt(0).toUpperCase() : '?';
+  };
 
   return (
     <Layout>
@@ -74,6 +175,108 @@ export default function Dashboard() {
                 <Link to="/profile" className="theme-button-secondary inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold">
                   View profile
                 </Link>
+              </div>
+            </motion.section>
+
+            <motion.section
+              className="theme-card rounded-[32px] p-6 min-h-[250px] lg:col-span-2"
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              custom={0.18}
+              whileHover={{ y: -3, scale: 1.003 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 22 }}
+            >
+              <div className="theme-card-content">
+                <div className="flex items-center justify-between gap-3 mb-5">
+                  <div>
+                    <p className="theme-subtle-label font-semibold">Insights</p>
+                    <h3 className="text-2xl md:text-3xl font-bold text-[#20314d]">Hot Links and Recent Links</h3>
+                    <p className="theme-muted text-sm mt-1">Your most revisited links and your latest additions, all in one glance.</p>
+                  </div>
+                  <Link to="/shelf" className="theme-button-secondary text-sm font-semibold rounded-full px-4 py-2 hover:underline">See all in shelf →</Link>
+                </div>
+
+                {linksLoading ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {[0, 1].map((col) => (
+                      <div key={col} className="bg-white/45 rounded-2xl p-4 border border-white/60">
+                        <div className="h-4 w-28 rounded-full bg-white/70 animate-pulse mb-3" />
+                        <div className="space-y-2">
+                          {[0, 1, 2].map((row) => (
+                            <div key={row} className="h-12 rounded-xl bg-white/60 animate-pulse" />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : dashboardLinks.length === 0 ? (
+                  <div className="bg-white/45 rounded-2xl p-5 border border-white/60">
+                    <p className="theme-muted text-sm">Add a few links in your shelf and this panel will highlight your most active and most recent ones.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="bg-white/45 rounded-2xl p-4 border border-white/60">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="theme-subtle-label font-semibold">Hot Links</p>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#F4845F] bg-[#F4845F]/10 border border-[#F4845F]/20 rounded-full px-2 py-1">Most visited</span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {hotLinks.map((item, index) => (
+                          <motion.a
+                            key={`hot-${item._id}`}
+                            href={item.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 bg-white/60 hover:bg-white/90 border border-transparent hover:border-white/70 transition"
+                            whileHover={{ x: 2 }}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                                {index + 1}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-[#20314d] truncate">{item.title || item.url}</p>
+                                <p className="text-xs theme-muted truncate">{getDomain(item.url)} · active {formatMinutesIdle(item.minutesIdle)}</p>
+                              </div>
+                            </div>
+                            <ArrowUpRight size={15} className="text-[#F4845F] flex-shrink-0" />
+                          </motion.a>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white/45 rounded-2xl p-4 border border-white/60">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="theme-subtle-label font-semibold">Recent Links</p>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5f7498] bg-white/60 border border-white/70 rounded-full px-2 py-1">Latest saved</span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {recentLinks.map((item) => (
+                          <motion.a
+                            key={`recent-${item._id}`}
+                            href={item.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 bg-white/60 hover:bg-white/90 border border-transparent hover:border-white/70 transition"
+                            whileHover={{ x: 2 }}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-7 h-7 rounded-full bg-white/90 border border-white/80 text-[#20314d] text-xs font-bold flex items-center justify-center flex-shrink-0">
+                                {getInitial(item.title, item.url)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-[#20314d] truncate">{item.title || item.url}</p>
+                                <p className="text-xs theme-muted truncate">{getDomain(item.url)} · added {new Date(item.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <ArrowUpRight size={15} className="text-[#F4845F] flex-shrink-0" />
+                          </motion.a>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.section>
 
@@ -148,11 +351,12 @@ export default function Dashboard() {
                 </div>
               </div>
             </motion.section>
+
           </div>
 
           <aside className="grid gap-6 auto-rows-min">
             <motion.div
-              className="theme-card rounded-[28px] p-4 flex items-center gap-3"
+              className="theme-card rounded-[28px] p-4"
               variants={cardVariants}
               initial="hidden"
               animate="visible"
@@ -160,16 +364,54 @@ export default function Dashboard() {
               whileHover={{ y: -3, scale: 1.004 }}
               transition={{ type: 'spring', stiffness: 220, damping: 22 }}
             >
-              <div className="theme-panel rounded-full flex-1 flex items-center gap-3 px-4 py-2.5">
-                <Search size={16} className="theme-muted flex-shrink-0" />
-                <span className="text-sm theme-muted">Search…</span>
+              <div className="theme-card-content space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="theme-panel rounded-full flex-1 flex items-center gap-3 px-4 py-2.5">
+                    <Search size={16} className="theme-muted flex-shrink-0" />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setSearchOpen(true)}
+                      placeholder="Semantic search your shelf…"
+                      className="bg-transparent outline-none border-none w-full text-sm text-[#20314d] placeholder:text-[#8aa0c1]"
+                    />
+                  </div>
+                  <button className="w-11 h-11 rounded-full bg-white/70 border border-white/70 flex items-center justify-center text-[#20314d]">
+                    <Bell size={18} />
+                  </button>
+                  <button className="w-11 h-11 rounded-full bg-white/70 border border-white/70 flex items-center justify-center text-[#20314d]">
+                    <UserCircle2 size={18} />
+                  </button>
+                </div>
+
+                {searchOpen && searchQuery.trim() && (
+                  <div className="bg-white/50 border border-white/70 rounded-2xl p-3">
+                    {searchLoading ? (
+                      <p className="theme-muted text-sm">Searching by meaning…</p>
+                    ) : searchResults.length === 0 ? (
+                      <p className="theme-muted text-sm">No semantic matches found for this query.</p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {searchResults.map((item) => (
+                          <a
+                            key={item._id}
+                            href={item.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 bg-white/60 hover:bg-white/85 transition"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-[#20314d] truncate">{item.title || item.url}</p>
+                              <p className="text-xs theme-muted truncate">{item.summary || item.url}</p>
+                            </div>
+                            <ArrowUpRight size={14} className="text-[#F4845F] flex-shrink-0" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <button className="w-11 h-11 rounded-full bg-white/70 border border-white/70 flex items-center justify-center text-[#20314d]">
-                <Bell size={18} />
-              </button>
-              <button className="w-11 h-11 rounded-full bg-white/70 border border-white/70 flex items-center justify-center text-[#20314d]">
-                <UserCircle2 size={18} />
-              </button>
             </motion.div>
 
             <motion.div

@@ -53,6 +53,15 @@ export default function LinkCard({ link }) {
           shadow-lg hover:shadow-xl hover:-translate-y-1
           transition-all duration-300 cursor-pointer group
           ${getDecayStyle(link.status)}`}
+        onClick={() => setShowDetail(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setShowDetail(true);
+          }
+        }}
+        role="button"
+        tabIndex={0}
       >
         {/* Screenshot thumbnail */}
         {screenshotSrc && (
@@ -89,7 +98,10 @@ export default function LinkCard({ link }) {
             {EMOJIS.map((emoji) => (
               <button
                 key={emoji}
-                onClick={() => handleReact(emoji)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReact(emoji);
+                }}
                 className="text-sm px-2 py-0.5 rounded-full bg-white/50 hover:bg-white/80 transition flex items-center gap-1"
               >
                 {emoji}
@@ -112,12 +124,21 @@ export default function LinkCard({ link }) {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setShowDetail(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDetail(true);
+                }}
                 className="text-xs font-semibold text-[#6B7280] hover:text-[#1A1A2E] transition underline underline-offset-2"
               >
                 Context
               </button>
-              <button onClick={handleOpen} className="text-xs font-semibold text-[#F4845F] hover:underline">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpen();
+                }}
+                className="text-xs font-semibold text-[#F4845F] hover:underline"
+              >
                 Open →
               </button>
             </div>
