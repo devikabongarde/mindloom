@@ -36,6 +36,18 @@ export default function Scene7_CTA() {
           >
             I ALREADY HAVE AN ACCOUNT
           </motion.button>
+          </div>
+
+          <div className="pt-1">
+            <motion.a
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.98 }}
+              className="cta-button"
+              href="/shelflife-quick-save.zip"
+              download
+            >
+              DOWNLOAD EXTENSION
+            </motion.a>
         </div>
       </div>
 

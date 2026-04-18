@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Lenis from 'lenis'
+import { useNavigate } from 'react-router-dom'
 import Scene1_Hero from './scenes/Scene1_Hero'
 import Scene2_Problem from './scenes/Scene2_Problem'
 import Scene3_Solution from './scenes/Scene3_Solution'
@@ -86,11 +87,16 @@ const BLOB_MOTION = [
   { parallaxX: 0.42, parallaxY: -0.29, driftX: 27, driftY: 23, tilt: 0.012, speed: 0.0012, phase: 4.1 },
 ]
 
+const AUTO_ADVANCE_MS = 6000
+const AUTO_ADVANCE_COOLDOWN_MS = 2500
+
 export default function ScrollScenes() {
+  const navigate = useNavigate()
   const containerRef = useRef(null)
   const blobRefs = useRef([])
   const blobStateRef = useRef(BLOB_MOTION.map(() => ({ x: 0, y: 0, r: 0 })))
   const activeRef = useRef(0)
+  const lastInteractionRef = useRef(Date.now())
   const [activeIndex, setActiveIndex] = useState(0)
   const [direction, setDirection] = useState(1)
   const [sceneProgress, setSceneProgress] = useState(0)
@@ -198,6 +204,51 @@ export default function ScrollScenes() {
     }
   }, [])
 
+  useEffect(() => {
+    const markInteraction = () => {
+      lastInteractionRef.current = Date.now()
+    }
+
+    window.addEventListener('wheel', markInteraction, { passive: true })
+    window.addEventListener('touchstart', markInteraction, { passive: true })
+    window.addEventListener('keydown', markInteraction)
+    window.addEventListener('pointerdown', markInteraction, { passive: true })
+
+    const timer = window.setInterval(() => {
+      if (document.hidden) {
+        return
+      }
+
+      if (Date.now() - lastInteractionRef.current < AUTO_ADVANCE_COOLDOWN_MS) {
+        return
+      }
+
+      const container = containerRef.current
+      if (!container) {
+        return
+      }
+
+      const maxIndex = SCENES.length - 1
+      if (activeRef.current >= maxIndex) {
+        return
+      }
+      const nextIndex = activeRef.current + 1
+      const containerTop = container.getBoundingClientRect().top + window.scrollY
+      const targetTop = containerTop + nextIndex * window.innerHeight + 2
+
+      window.scrollTo({ top: targetTop, behavior: 'smooth' })
+      lastInteractionRef.current = Date.now()
+    }, AUTO_ADVANCE_MS)
+
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('wheel', markInteraction)
+      window.removeEventListener('touchstart', markInteraction)
+      window.removeEventListener('keydown', markInteraction)
+      window.removeEventListener('pointerdown', markInteraction)
+    }
+  }, [])
+
   const ActiveScene = SCENES[activeIndex].Component
   const transitionStyle = TRANSITION_STYLES[activeIndex % TRANSITION_STYLES.length]
 
@@ -217,6 +268,16 @@ export default function ScrollScenes() {
         </div>
 
         <div className="scene-overlay" aria-hidden="true" />
+
+        {activeIndex < SCENES.length - 1 && (
+          <button
+            type="button"
+            className="landing-get-started-btn"
+            onClick={() => navigate('/register')}
+          >
+            GET STARTED
+          </button>
+        )}
 
         <AnimatePresence mode="wait">
           <motion.div

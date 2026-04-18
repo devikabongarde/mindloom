@@ -287,6 +287,42 @@ body.landing-theme::after {
   color: #a4b4da;
 }
 
+.landing-get-started-btn {
+  position: absolute;
+  top: clamp(0.85rem, 2.4vw, 1.5rem);
+  right: clamp(0.85rem, 2.4vw, 1.6rem);
+  z-index: 24;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem;
+  background:
+    linear-gradient(132deg, rgba(255, 255, 255, 0.88), rgba(233, 244, 255, 0.78) 46%, rgba(213, 242, 234, 0.64) 100%),
+    radial-gradient(circle at 20% 22%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+  color: #21475b;
+  font-family: 'Sora', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 10px 20px rgba(130, 156, 197, 0.26),
+    0 4px 8px rgba(132, 160, 202, 0.18);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
+}
+
+.landing-get-started-btn:hover {
+  transform: translateY(-1px);
+  color: #173a4d;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    0 14px 24px rgba(113, 148, 192, 0.3),
+    0 6px 12px rgba(123, 154, 201, 0.22);
+}
+
 .dust-field {
   position: absolute;
   inset: 0;
@@ -866,6 +902,13 @@ body.landing-theme::after {
 
   .intro-center {
     transform: none;
+  }
+
+  .landing-get-started-btn {
+    top: 0.8rem;
+    right: 0.85rem;
+    font-size: 0.64rem;
+    padding: 0.45rem 0.8rem;
   }
 
   .clutter-line {
