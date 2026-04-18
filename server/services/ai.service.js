@@ -1,56 +1,54 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+import { scrapePage } from './scraper.service.js';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
-// Fetches title and raw text from a URL using axios + cheerio
-async function fetchPageContent(url) {
-  const { data } = await axios.get(url, {
-    timeout: 8000,
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-  });
-  const $ = cheerio.load(data);
-  const title =
-    $('title').text() ||
-    $('meta[property="og:title"]').attr('content') ||
-    url;
-  const description =
-    $('meta[name="description"]').attr('content') ||
-    $('meta[property="og:description"]').attr('content') ||
-    '';
-  const bodyText = $('body').text().replace(/\s+/g, ' ').slice(0, 3000);
-  return { title: title.trim(), content: description || bodyText };
-}
-
-// Calls Gemini to generate a 2-3 sentence executive summary
-export async function summarizeUrl(url) {
+/**
+ * Full autonomous pipeline:
+ * 1. Headless Puppeteer scrapes title, description, body text, and screenshot
+ * 2. Gemini generates a 3-sentence executive summary from the scraped content
+ * Returns: { title, summary, screenshotUrl }
+ */
+export async function enrichUrlWithAI(url, linkId) {
   try {
-    const { title, content } = await fetchPageContent(url);
-    const prompt = `You are a sharp research assistant. Given this webpage content, 
-write a 2-3 sentence executive summary in plain English. 
-Be direct and useful. No fluff.
+    const scraped = await scrapePage(url, linkId);
 
-Page Title: ${title}
-Content: ${content}
+    const textForSummary = `
+Title: ${scraped.title}
+Description: ${scraped.description}
+Body Preview: ${scraped.bodyPreview}
+    `.trim();
 
-Return ONLY the summary. No labels, no markdown.`;
+    const prompt = `You are a sharp research assistant. Given this webpage content, write a clear 3-sentence executive summary in plain English. Focus on what the page is about, who it's for, and why it's useful. No bullet points, no markdown, no labels.
+
+Content:
+${textForSummary}
+
+Return ONLY the summary sentences.`;
 
     const result = await model.generateContent(prompt);
     const summary = result.response.text().trim();
-    return { title, summary };
-  } catch (err) {
-    console.error('summarizeUrl error:', err.message);
-    const fallbackTitle = url.replace(/https?:\/\//, '').split('/')[0];
+
     return {
-      title: fallbackTitle,
-      summary: "We couldn't summarize this link, but it's safely stored.",
+      title:         scraped.title,
+      summary,
+      screenshotUrl: scraped.screenshotUrl,
+    };
+  } catch (err) {
+    console.error('enrichUrlWithAI error:', err.message);
+    return {
+      title:         url.replace(/https?:\/\//, '').split('/')[0],
+      summary:       "We couldn't fully scrape this link, but it's safely stored.",
+      screenshotUrl: null,
     };
   }
 }
 
-// Calls Gemini to classify the link into vibe tags
+/**
+ * Classifies a summary into 1-3 vibe tags using Gemini.
+ * Returns a string array — always falls back to ['Educational'].
+ */
 export async function classifyVibes(summary) {
   try {
     const prompt = `Given this content summary: "${summary}"

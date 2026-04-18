@@ -17,6 +17,7 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.0",
+    "puppeteer": "^24.41.0",
     "serpapi": "^2.2.1",
     "socket.io": "^4.8.3"
   },

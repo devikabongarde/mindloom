@@ -3,10 +3,14 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
 import authRoutes from './routes/auth.routes.js';
 import shelfRoutes from './routes/shelf.routes.js';
 import linkRoutes from './routes/link.routes.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const server = http.createServer(app);
@@ -18,15 +22,16 @@ const io = new Server(server, {
   cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
 });
 
-// Make io available to route controllers via req.app.get('io')
 app.set('io', io);
 
-// Connect DB
 connectDB();
 
 // Middleware
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
+
+// Serve Puppeteer screenshots statically at /static/screenshots/...
+app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // HTTP Routes
 app.use('/api/auth', authRoutes);

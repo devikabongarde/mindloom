@@ -42,6 +42,11 @@ export default function Shelf() {
       setLinks((prev) => prev.find((l) => l._id === newLink._id) ? prev : [newLink, ...prev]);
     });
 
+    // Fires when Puppeteer+Gemini enrichment completes — updates the card in place
+    s.on('link-enriched', (enriched) => {
+      setLinks((prev) => prev.map((l) => l._id === enriched._id ? { ...l, ...enriched } : l));
+    });
+
     s.on('presence-update', (evt) => {
       setPresence((prev) => {
         const copy = { ...prev };
@@ -54,6 +59,7 @@ export default function Shelf() {
     return () => {
       s.emit('leave-shelf');
       s.off('link-created');
+      s.off('link-enriched');
       s.off('presence-update');
     };
   }, [user, shelfId]);
