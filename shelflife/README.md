@@ -30,4 +30,4 @@ npm run dev
 2. **Biological Decay**: Links progressively fade into grayscale (Aging -> Critical -> Dead) via an hourly cron engine if you neglect them. Dead links drop into the global `/compost` graveyard.
 3. **Multiplayer Cursors**: View live SVGs of users currently browsing the same archive shelf.
 
-**Note on Redis:** By default, Bull Queue falls back to an in-memory queue. Ensure your MongoDB Atlas URI, JWT_SECRET, and PERPLEXITY_API_KEY are configured in `server/.env`.
+**Note on Redis:** By default, Bull Queue falls back to an in-memory queue. Ensure your MongoDB Atlas URI and JWT_SECRET are configured. For AI features, set either `PERPLEXITY_API_KEY` or `GEMINI_API_KEY` in `server/.env`.

@@ -1,17 +1,11 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 const axios = require('axios');
-const { OpenAI } = require('openai');
 const { scrapeQueue } = require('./queue');
 const Link = require('../models/Link');
 const User = require('../models/User');
 const { computeCuratorArchetype } = require('../utils/archetype');
-
-// Initialize Perplexity Client using OpenAI SDK Compatibility
-const perplexity = new OpenAI({
-  apiKey: process.env.PERPLEXITY_API_KEY,
-  baseURL: 'https://api.perplexity.ai'
-});
+const { generateJson } = require('../utils/aiClient');
 
 scrapeQueue.process(3, async (job) => {
   const { linkId } = job.data;
@@ -104,27 +98,13 @@ scrapeQueue.process(3, async (job) => {
     Meta Description: ${pageData.metaDescription}
     Page Content: ${pageData.contentExcerpt}`;
 
-    const completion = await perplexity.chat.completions.create({
-      model: 'llama-3.1-sonar-small-128k-online', // Using standard model or 'llama-3.1-8b-instruct' if available
-      messages: [
-        { role: 'system', content: 'You are an AI curation assistant. Only return raw JSON. Do not wrap in ```json.' },
-        { role: 'user', content: prompt }
-      ]
+    const { parsed: aiData, provider } = await generateJson({
+      systemPrompt: 'You are an AI curation assistant. Return valid JSON only. Do not wrap your answer in markdown code fences.',
+      userPrompt: prompt,
+      perplexityModel: 'llama-3.1-sonar-small-128k-online',
+      geminiModel: 'gemini-1.5-flash',
     });
-
-    let aiRaw = completion.choices[0].message.content.trim();
-    // Strip markdown formatting if Perplexity forces it
-    if(aiRaw.startsWith('\`\`\`json')){
-       aiRaw = aiRaw.replace(/^\`\`\`json/, '').replace(/\`\`\`$/, '');
-    }
-    
-    let aiData;
-    try {
-       aiData = JSON.parse(aiRaw);
-    } catch(e) {
-       console.error(`[Scraper] AI parse error:`, aiRaw);
-       throw new Error("Failed to parse AI JSON response");
-    }
+    console.log(`[Scraper] AI provider used: ${provider}`);
 
     // Persist Results
     link.title = pageData.title;

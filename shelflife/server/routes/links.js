@@ -4,16 +4,8 @@ const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const Link = require('../models/Link');
 const Shelf = require('../models/Shelf');
-const { OpenAI } = require('openai');
 const { scrapeQueue } = require('../workers/queue');
-
-function getPerplexityClient() {
-  if (!process.env.PERPLEXITY_API_KEY) return null;
-  return new OpenAI({
-    apiKey: process.env.PERPLEXITY_API_KEY,
-    baseURL: 'https://api.perplexity.ai',
-  });
-}
+const { generateJson } = require('../utils/aiClient');
 
 // POST /api/links
 router.post('/', auth, validate(['url', 'shelfId']), async (req, res) => {
@@ -119,9 +111,8 @@ router.get('/:id/context', auth, async (req, res) => {
       return res.json(link.contextFeed);
     }
 
-    const perplexity = getPerplexityClient();
-    if (!perplexity) {
-      return res.status(503).json({ msg: 'Context grounding requires PERPLEXITY_API_KEY' });
+    if (!process.env.PERPLEXITY_API_KEY && !process.env.GEMINI_API_KEY) {
+      return res.status(503).json({ msg: 'Context grounding requires PERPLEXITY_API_KEY or GEMINI_API_KEY' });
     }
 
     const daysSaved = Math.max(
@@ -151,27 +142,19 @@ router.get('/:id/context', auth, async (req, res) => {
       '}'
     ].join('\n');
 
-    const completion = await perplexity.chat.completions.create({
-      model: 'llama-3.1-sonar-small-128k-online',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a research currency analyst. Return valid JSON only and no markdown code fences.',
-        },
-        { role: 'user', content: prompt },
-      ],
-    });
-
-    let aiRaw = completion.choices?.[0]?.message?.content?.trim() || '{}';
-    if (aiRaw.startsWith('```json')) {
-      aiRaw = aiRaw.replace(/^```json/, '').replace(/```$/, '').trim();
-    }
-
     let parsed;
+    let provider;
     try {
-      parsed = JSON.parse(aiRaw);
+      const result = await generateJson({
+        systemPrompt: 'You are a research currency analyst. Return valid JSON only and no markdown code fences.',
+        userPrompt: prompt,
+        perplexityModel: 'llama-3.1-sonar-small-128k-online',
+        geminiModel: 'gemini-1.5-flash',
+      });
+      parsed = result.parsed;
+      provider = result.provider;
     } catch (parseErr) {
-      return res.status(502).json({ msg: 'Failed to parse context feed response' });
+      return res.status(502).json({ msg: `Failed to generate context feed (${parseErr.message})` });
     }
 
     link.contextFeed = {
@@ -184,7 +167,7 @@ router.get('/:id/context', auth, async (req, res) => {
     };
     await link.save();
 
-    return res.json(link.contextFeed);
+    return res.json({ ...link.contextFeed.toObject?.() || link.contextFeed, provider });
   } catch (err) {
     console.error(err.message);
     return res.status(500).send('Server Error');
