@@ -1,5 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 
 const VIBE_COLORS = {
   Educational:   'bg-blue-100 text-blue-700',
@@ -10,22 +14,301 @@ const VIBE_COLORS = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, login, logout } = useAuth();
+  const navigate = useNavigate();
+  const avatarInputRef = useRef(null);
+  const [shelves, setShelves] = useState([]);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState(null);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [avatarMessage, setAvatarMessage] = useState('');
+  const [deleteMessage, setDeleteMessage] = useState('');
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    defaultShelfId: '',
+    curatorArchetypeName: '',
+    curatorArchetypeDescription: '',
+  });
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const [deleteForm, setDeleteForm] = useState({
+    currentPassword: '',
+    confirmation: '',
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    setForm({
+      name: user.name || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      defaultShelfId: user.defaultShelfId || '',
+      curatorArchetypeName: user.curatorArchetype?.name || '',
+      curatorArchetypeDescription: user.curatorArchetype?.description || '',
+    });
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/api/shelves/mine')
+      .then(({ data }) => {
+        if (!cancelled) setShelves(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setShelves([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (!user) return null;
 
   const archetype = user.curatorArchetype || { name: 'Fresh Soul', description: 'You just started curating.' };
   const stats = user.vibeStats || {};
   const initial = user.name?.charAt(0).toUpperCase() || '?';
+  const defaultShelfName = shelves.find((shelf) => String(shelf._id) === String(user.defaultShelfId || ''))?.name || 'No default shelf';
+  const resolveAssetUrl = (value) => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+
+    const origin = String(api.defaults.baseURL || '').replace(/\/$/, '');
+    const path = raw.startsWith('/') ? raw : `/${raw}`;
+    return origin ? `${origin}${path}` : raw;
+  };
+
+  const avatarSrc = !avatarLoadFailed ? resolveAssetUrl(user.avatarUrl) : null;
+
+  const handleSaveProfile = async () => {
+    try {
+      setSavingProfile(true);
+      setProfileMessage('');
+
+      const payload = {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        defaultShelfId: form.defaultShelfId || null,
+        curatorArchetypeName: form.curatorArchetypeName,
+        curatorArchetypeDescription: form.curatorArchetypeDescription,
+      };
+
+      const { data } = await api.patch('/api/auth/me', payload);
+      const token = localStorage.getItem('shelflife_token');
+      if (token) login(token, data);
+      setProfileMessage('Profile updated successfully.');
+    } catch (err) {
+      setProfileMessage(err?.response?.data?.message || 'Could not update profile.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordMessage('New password and confirm password do not match.');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      setPasswordMessage('');
+
+      await api.patch('/api/auth/me', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordMessage('Password updated successfully.');
+    } catch (err) {
+      setPasswordMessage(err?.response?.data?.message || 'Could not change password.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const updateAuthUser = (nextUser) => {
+    const token = localStorage.getItem('shelflife_token');
+    if (token) login(token, nextUser);
+  };
+
+  const handleAvatarSelected = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setAvatarMessage('Please choose an image file.');
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      setAvatarMessage('Image size must be 4MB or smaller.');
+      return;
+    }
+
+    try {
+      setUploadingAvatar(true);
+      setAvatarMessage('');
+
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Could not read image file'));
+        reader.readAsDataURL(file);
+      });
+
+      const { data } = await api.patch('/api/auth/me', { avatarDataUrl: dataUrl });
+      updateAuthUser(data);
+      setAvatarLoadFailed(false);
+      setAvatarMessage('Profile photo updated.');
+    } catch (err) {
+      setAvatarMessage(err?.response?.data?.message || 'Could not update profile photo.');
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    try {
+      setUploadingAvatar(true);
+      setAvatarMessage('');
+
+      const { data } = await api.patch('/api/auth/me', { avatarUrl: null });
+      updateAuthUser(data);
+      setAvatarLoadFailed(false);
+      setAvatarMessage('Profile photo removed.');
+    } catch (err) {
+      setAvatarMessage(err?.response?.data?.message || 'Could not remove profile photo.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteForm.confirmation !== 'DELETE') {
+      setDeleteMessage('Type DELETE exactly to confirm account deletion.');
+      return;
+    }
+
+    if (!deleteForm.currentPassword) {
+      setDeleteMessage('Current password is required to delete your account.');
+      return;
+    }
+
+    try {
+      setDeletingAccount(true);
+      setDeleteMessage('');
+
+      await api.delete('/api/auth/me', {
+        data: {
+          currentPassword: deleteForm.currentPassword,
+          confirmation: deleteForm.confirmation,
+        },
+      });
+
+      logout();
+      navigate('/register');
+    } catch (err) {
+      setDeleteMessage(err?.response?.data?.message || 'Could not delete account.');
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
 
   return (
     <Layout>
-      <div className="flex flex-col gap-8 max-w-3xl">
-        <h1 className="theme-hero-title text-3xl font-bold">Curator Profile</h1>
+      <div className="flex flex-col gap-8 max-w-4xl">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="theme-hero-title text-3xl font-bold">Curator Profile</h1>
+
+          <div className="relative">
+            <button
+              onClick={() => setSettingsOpen((prev) => !prev)}
+              className="w-11 h-11 rounded-full bg-white/75 border border-white/80 shadow-sm flex items-center justify-center text-[#20314d]"
+              aria-label="Open profile settings"
+              title="Profile settings"
+            >
+              <Settings size={18} />
+            </button>
+
+            {settingsOpen && (
+              <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-white/80 bg-white/90 shadow-xl p-2 z-10">
+                <button
+                  onClick={() => {
+                    setActivePanel('photo');
+                    setSettingsOpen(false);
+                  }}
+                  className="w-full text-left rounded-xl px-3 py-2 text-sm font-medium text-[#20314d] hover:bg-[#edf3ff]"
+                >
+                  Upload Photo
+                </button>
+                <button
+                  onClick={() => {
+                    setActivePanel('edit');
+                    setSettingsOpen(false);
+                  }}
+                  className="w-full text-left rounded-xl px-3 py-2 text-sm font-medium text-[#20314d] hover:bg-[#edf3ff]"
+                >
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setActivePanel('security');
+                    setSettingsOpen(false);
+                  }}
+                  className="w-full text-left rounded-xl px-3 py-2 text-sm font-medium text-[#20314d] hover:bg-[#edf3ff]"
+                >
+                  Security
+                </button>
+                <button
+                  onClick={() => {
+                    setActivePanel('danger');
+                    setSettingsOpen(false);
+                  }}
+                  className="w-full text-left rounded-xl px-3 py-2 text-sm font-medium text-[#8a2232] hover:bg-red-100/70"
+                >
+                  Delete Account
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="theme-card rounded-[24px] p-6 shadow-xl flex flex-col sm:flex-row gap-5 items-start">
-          <div className="w-20 h-20 rounded-[16px] bg-gradient-to-br from-[#F4845F] to-[#E8617A] flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0">
-            {initial}
-          </div>
+          {avatarSrc ? (
+            <img
+              src={avatarSrc}
+              alt="Profile"
+              onError={() => {
+                setAvatarLoadFailed(true);
+                setAvatarMessage('Could not load profile image. Try uploading again.');
+              }}
+              className="w-20 h-20 rounded-[16px] object-cover shadow-lg flex-shrink-0"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-[16px] bg-gradient-to-br from-[#F4845F] to-[#E8617A] flex items-center justify-center text-white text-3xl font-bold shadow-lg flex-shrink-0">
+              {initial}
+            </div>
+          )}
 
           <div className="theme-card-content flex-1">
             <h2 className="text-xl font-bold">{user.name}</h2>
@@ -37,8 +320,228 @@ export default function Profile() {
               <p className="text-lg font-bold">{archetype.name}</p>
               <p className="text-sm theme-muted mt-1 leading-relaxed">{archetype.description}</p>
             </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl bg-white/55 border border-white/70 px-3 py-2">
+                <p className="text-[11px] theme-muted uppercase tracking-wide">Name</p>
+                <p className="text-sm font-semibold text-[#20314d] mt-0.5">{user.name || 'Not set'}</p>
+              </div>
+              <div className="rounded-xl bg-white/55 border border-white/70 px-3 py-2">
+                <p className="text-[11px] theme-muted uppercase tracking-wide">Email</p>
+                <p className="text-sm font-semibold text-[#20314d] mt-0.5 break-all">{user.email || 'Not set'}</p>
+              </div>
+              <div className="rounded-xl bg-white/55 border border-white/70 px-3 py-2">
+                <p className="text-[11px] theme-muted uppercase tracking-wide">Phone</p>
+                <p className="text-sm font-semibold text-[#20314d] mt-0.5">{user.phone || 'Not set'}</p>
+              </div>
+              <div className="rounded-xl bg-white/55 border border-white/70 px-3 py-2">
+                <p className="text-[11px] theme-muted uppercase tracking-wide">Default Shelf</p>
+                <p className="text-sm font-semibold text-[#20314d] mt-0.5">{defaultShelfName}</p>
+              </div>
+            </div>
           </div>
         </div>
+
+        {activePanel === 'photo' && (
+          <div className="theme-card rounded-[24px] p-6 shadow-xl flex flex-col gap-4">
+            <div className="theme-card-content flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-[#20314d]">Photo Settings</h3>
+                <p className="text-sm theme-muted mt-1">Upload or remove your profile image.</p>
+              </div>
+              <button
+                onClick={() => setActivePanel(null)}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold bg-white/75 border border-white/70 text-[#20314d]"
+              >
+                Close
+              </button>
+            </div>
+
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarSelected}
+              className="hidden"
+            />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="theme-button-secondary rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-70"
+              >
+                {uploadingAvatar ? 'Uploading...' : 'Choose and Upload'}
+              </button>
+              {avatarSrc && (
+                <button
+                  onClick={handleRemoveAvatar}
+                  disabled={uploadingAvatar}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold bg-white/75 border border-white/70 text-[#20314d] disabled:opacity-70"
+                >
+                  Remove Photo
+                </button>
+              )}
+              <p className="text-xs theme-muted">{avatarMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {activePanel === 'edit' && (
+          <div className="theme-card rounded-[24px] p-6 shadow-xl flex flex-col gap-5">
+            <div className="theme-card-content flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-[#20314d]">Edit Profile</h3>
+                <p className="text-sm theme-muted mt-1">Update your account details and preferred shelf.</p>
+              </div>
+              <button
+                onClick={() => setActivePanel(null)}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold bg-white/75 border border-white/70 text-[#20314d]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs theme-muted">Name</span>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs theme-muted">Email</span>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs theme-muted">Phone</span>
+                <input
+                  value={form.phone}
+                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Optional"
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs theme-muted">Default Shelf</span>
+                <select
+                  value={form.defaultShelfId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, defaultShelfId: e.target.value }))}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                >
+                  <option value="">No default shelf</option>
+                  {shelves.map((shelf) => (
+                    <option key={shelf._id} value={shelf._id}>{shelf.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 md:col-span-2">
+                <span className="text-xs theme-muted">Archetype Name</span>
+                <input
+                  value={form.curatorArchetypeName}
+                  onChange={(e) => setForm((prev) => ({ ...prev, curatorArchetypeName: e.target.value }))}
+                  placeholder="Example: Knowledge Librarian"
+                  maxLength={80}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 md:col-span-2">
+                <span className="text-xs theme-muted">Archetype Description</span>
+                <textarea
+                  value={form.curatorArchetypeDescription}
+                  onChange={(e) => setForm((prev) => ({ ...prev, curatorArchetypeDescription: e.target.value }))}
+                  placeholder="Describe your curation style"
+                  maxLength={280}
+                  rows={3}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none resize-y"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs theme-muted">{profileMessage}</p>
+              <button
+                onClick={handleSaveProfile}
+                disabled={savingProfile}
+                className="theme-button rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-70"
+              >
+                {savingProfile ? 'Saving...' : 'Save Profile'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activePanel === 'security' && (
+          <div className="theme-card rounded-[24px] p-6 shadow-xl flex flex-col gap-5">
+            <div className="theme-card-content flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-[#20314d]">Security</h3>
+                <p className="text-sm theme-muted mt-1">Change your account password.</p>
+              </div>
+              <button
+                onClick={() => setActivePanel(null)}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold bg-white/75 border border-white/70 text-[#20314d]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs theme-muted">Current Password</span>
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs theme-muted">New Password</span>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs theme-muted">Confirm Password</span>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs theme-muted">{passwordMessage}</p>
+              <button
+                onClick={handleChangePassword}
+                disabled={changingPassword}
+                className="theme-button-secondary rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-70"
+              >
+                {changingPassword ? 'Updating...' : 'Change Password'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="theme-panel rounded-[24px] p-6 shadow-lg">
           <p className="theme-card-content text-sm font-semibold mb-4">Your vibe distribution</p>
@@ -58,6 +561,57 @@ export default function Profile() {
             </div>
           )}
         </div>
+
+        {activePanel === 'danger' && (
+          <div className="theme-card rounded-[24px] p-6 shadow-xl flex flex-col gap-5 border border-red-200/70 bg-red-50/40">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-[#8a2232]">Danger Zone</h3>
+                <p className="text-sm text-[#8a2232]/80 mt-1">
+                  Permanently delete your account and all owned shelves, links, comments, invites, and notifications.
+                </p>
+              </div>
+              <button
+                onClick={() => setActivePanel(null)}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold bg-white/75 border border-red-200 text-[#8a2232]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-[#8a2232]/80">Current Password</span>
+                <input
+                  type="password"
+                  value={deleteForm.currentPassword}
+                  onChange={(e) => setDeleteForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                  className="rounded-xl bg-white/80 border border-red-200 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-[#8a2232]/80">Type DELETE to confirm</span>
+                <input
+                  value={deleteForm.confirmation}
+                  onChange={(e) => setDeleteForm((prev) => ({ ...prev, confirmation: e.target.value }))}
+                  className="rounded-xl bg-white/80 border border-red-200 px-3 py-2 text-sm text-[#20314d] outline-none"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-[#8a2232]/80">{deleteMessage}</p>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount}
+                className="rounded-full px-4 py-2 text-sm font-semibold bg-[#bf334c] text-white hover:bg-[#ab2b43] disabled:opacity-70"
+              >
+                {deletingAccount ? 'Deleting...' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

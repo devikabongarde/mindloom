@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Notification from '../models/Notification.js';
 import Shelf from '../models/Shelf.js';
+import ShelfComment from '../models/ShelfComment.js';
 import Link from '../models/Link.js';
 import ShelfInvite from '../models/ShelfInvite.js';
 import User from '../models/User.js';
@@ -188,6 +189,7 @@ export const deleteShelf = async (req, res) => {
 
     await Promise.all([
       Link.deleteMany({ shelfId: shelf._id }),
+      ShelfComment.deleteMany({ shelfId: shelf._id }),
       ShelfInvite.deleteMany({ shelfId: shelf._id }),
       Shelf.updateMany({ parentShelfId: shelf._id }, { $set: { parentShelfId: null } }),
       User.updateMany({ defaultShelfId: shelf._id }, { $set: { defaultShelfId: null } }),

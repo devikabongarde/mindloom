@@ -29,6 +29,10 @@ export default function Social() {
   const [discoverQuery, setDiscoverQuery] = useState('');
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverUsers, setDiscoverUsers] = useState([]);
+  const [openDiscussionByShelfId, setOpenDiscussionByShelfId] = useState({});
+  const [commentsByShelfId, setCommentsByShelfId] = useState({});
+  const [commentTextByShelfId, setCommentTextByShelfId] = useState({});
+  const [commentLoadingByShelfId, setCommentLoadingByShelfId] = useState({});
 
   const refreshFriends = async () => {
     const { data } = await api.get('/api/social/friends');
@@ -147,6 +151,56 @@ export default function Social() {
       if (data?._id) navigate(`/shelf/${data._id}`);
     } catch {
       alert('Could not fork this shelf. You may not have access.');
+    }
+  };
+
+  const loadShelfComments = async (shelfId) => {
+    setCommentLoadingByShelfId((prev) => ({ ...prev, [shelfId]: true }));
+    try {
+      const { data } = await api.get(`/api/social/shelves/${shelfId}/comments`, { params: { limit: 40 } });
+      setCommentsByShelfId((prev) => ({
+        ...prev,
+        [shelfId]: Array.isArray(data) ? data : [],
+      }));
+    } catch {
+      setCommentsByShelfId((prev) => ({ ...prev, [shelfId]: [] }));
+    } finally {
+      setCommentLoadingByShelfId((prev) => ({ ...prev, [shelfId]: false }));
+    }
+  };
+
+  const toggleDiscussion = async (shelfId) => {
+    const nextOpen = !openDiscussionByShelfId[shelfId];
+    setOpenDiscussionByShelfId((prev) => ({ ...prev, [shelfId]: nextOpen }));
+
+    if (nextOpen && !commentsByShelfId[shelfId]) {
+      await loadShelfComments(shelfId);
+    }
+  };
+
+  const handleAddComment = async (shelfId) => {
+    const text = String(commentTextByShelfId[shelfId] || '').trim();
+    if (!text) return;
+
+    setCommentLoadingByShelfId((prev) => ({ ...prev, [shelfId]: true }));
+    try {
+      const { data } = await api.post(`/api/social/shelves/${shelfId}/comments`, { text });
+
+      setCommentsByShelfId((prev) => ({
+        ...prev,
+        [shelfId]: [data, ...(prev[shelfId] || [])],
+      }));
+      setCommentTextByShelfId((prev) => ({ ...prev, [shelfId]: '' }));
+
+      setFeed((prev) => prev.map((item) => (
+        item._id === shelfId
+          ? { ...item, commentsCount: (item.commentsCount || 0) + 1 }
+          : item
+      )));
+    } catch {
+      alert('Could not post comment.');
+    } finally {
+      setCommentLoadingByShelfId((prev) => ({ ...prev, [shelfId]: false }));
     }
   };
 
@@ -279,6 +333,12 @@ export default function Social() {
                         <span>by {item.ownerName || 'Unknown'}</span>
                         <div className="flex items-center gap-3">
                           <button
+                            onClick={() => toggleDiscussion(item._id)}
+                            className="font-semibold text-[#5f7498]"
+                          >
+                            Discuss ({item.commentsCount || 0})
+                          </button>
+                          <button
                             onClick={() => handleStarShelf(item._id)}
                             title={item.starredByMe ? 'Unstar shelf' : 'Star shelf'}
                             aria-label={item.starredByMe ? 'Unstar shelf' : 'Star shelf'}
@@ -301,6 +361,45 @@ export default function Social() {
                           </RouterLink>
                         </div>
                       </div>
+
+                      {openDiscussionByShelfId[item._id] && (
+                        <div className="mt-3 rounded-xl border border-white/70 bg-white/55 p-3">
+                          {commentLoadingByShelfId[item._id] && !commentsByShelfId[item._id] ? (
+                            <p className="text-xs theme-muted">Loading discussion…</p>
+                          ) : (
+                            <>
+                              <div className="max-h-44 overflow-y-auto flex flex-col gap-2 pr-1">
+                                {(commentsByShelfId[item._id] || []).length === 0 ? (
+                                  <p className="text-xs theme-muted">Start the discussion for this shelf.</p>
+                                ) : (
+                                  (commentsByShelfId[item._id] || []).map((comment) => (
+                                    <div key={comment._id} className="rounded-lg bg-white/70 border border-white/70 px-2.5 py-2">
+                                      <p className="text-[11px] font-semibold text-[#20314d]">{comment.user?.name || 'Unknown'}</p>
+                                      <p className="text-xs text-[#2b4265] mt-0.5 break-words">{comment.text}</p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              <div className="mt-2 flex items-center gap-2">
+                                <input
+                                  value={commentTextByShelfId[item._id] || ''}
+                                  onChange={(e) => setCommentTextByShelfId((prev) => ({ ...prev, [item._id]: e.target.value }))}
+                                  placeholder="Add a comment..."
+                                  className="flex-1 rounded-lg bg-white/80 border border-white/70 px-3 py-2 text-xs text-[#20314d] placeholder:text-[#8aa0c1] outline-none"
+                                />
+                                <button
+                                  onClick={() => handleAddComment(item._id)}
+                                  disabled={commentLoadingByShelfId[item._id] || !String(commentTextByShelfId[item._id] || '').trim()}
+                                  className="theme-button rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-70"
+                                >
+                                  Send
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

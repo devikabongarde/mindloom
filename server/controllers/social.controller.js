@@ -1,6 +1,7 @@
 import Link from '../models/Link.js';
 import Notification from '../models/Notification.js';
 import Shelf from '../models/Shelf.js';
+import ShelfComment from '../models/ShelfComment.js';
 import User from '../models/User.js';
 
 function toSet(values = []) {
@@ -48,6 +49,14 @@ export async function getSocialFeed(req, res) {
       .limit(400)
       .populate('addedBy', 'name')
       .lean();
+
+    const commentCountsRaw = await ShelfComment.aggregate([
+      { $match: { shelfId: { $in: shelfIdList } } },
+      { $group: { _id: '$shelfId', count: { $sum: 1 } } },
+    ]);
+    const commentCountByShelfId = new Map(
+      commentCountsRaw.map((row) => [String(row._id), row.count])
+    );
 
     const shelfStats = new Map();
     for (const shelf of publicShelves) {
@@ -100,6 +109,7 @@ export async function getSocialFeed(req, res) {
           ownerName: shelf.ownerId?.name || 'Unknown',
           starCount: Array.isArray(shelf.starredBy) ? shelf.starredBy.length : 0,
           starredByMe: Array.isArray(shelf.starredBy) ? shelf.starredBy.some((id) => String(id) === String(req.user.id)) : false,
+          commentsCount: commentCountByShelfId.get(String(shelf._id)) || 0,
           totalLinks: stats.totalLinks,
           totalReactions: stats.totalReactions,
           latestActivityAt: stats.latestActivityAt,
@@ -341,6 +351,75 @@ export async function markAllNotificationsRead(req, res) {
   } catch (err) {
     console.error('markAllNotificationsRead error:', err.message);
     res.status(500).json({ message: 'Server error marking all notifications as read' });
+  }
+}
+
+export async function getShelfComments(req, res) {
+  try {
+    const limit = Math.min(100, Math.max(10, Number.parseInt(req.query.limit || '40', 10)));
+    const shelf = await Shelf.findById(req.params.shelfId).select('isPublic members');
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isMember = (shelf.members || []).map(String).includes(String(req.user.id));
+    if (!shelf.isPublic && !isMember) {
+      return res.status(403).json({ message: 'You do not have access to this shelf discussion' });
+    }
+
+    const comments = await ShelfComment.find({ shelfId: shelf._id })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('userId', 'name')
+      .lean();
+
+    res.json(comments.map((c) => ({
+      _id: c._id,
+      text: c.text,
+      createdAt: c.createdAt,
+      user: {
+        _id: c.userId?._id || null,
+        name: c.userId?.name || 'Unknown',
+      },
+    })));
+  } catch (err) {
+    console.error('getShelfComments error:', err.message);
+    res.status(500).json({ message: 'Server error fetching shelf comments' });
+  }
+}
+
+export async function addShelfComment(req, res) {
+  try {
+    const text = String(req.body?.text || '').trim();
+    if (!text) return res.status(400).json({ message: 'Comment text is required' });
+    if (text.length > 500) return res.status(400).json({ message: 'Comment must be 500 characters or less' });
+
+    const shelf = await Shelf.findById(req.params.shelfId).select('isPublic members ownerId name');
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isMember = (shelf.members || []).map(String).includes(String(req.user.id));
+    if (!shelf.isPublic && !isMember) {
+      return res.status(403).json({ message: 'You do not have access to this shelf discussion' });
+    }
+
+    const comment = await ShelfComment.create({
+      shelfId: shelf._id,
+      userId: req.user.id,
+      text,
+    });
+
+    const populated = await ShelfComment.findById(comment._id).populate('userId', 'name').lean();
+
+    res.status(201).json({
+      _id: populated._id,
+      text: populated.text,
+      createdAt: populated.createdAt,
+      user: {
+        _id: populated.userId?._id || null,
+        name: populated.userId?.name || 'Unknown',
+      },
+    });
+  } catch (err) {
+    console.error('addShelfComment error:', err.message);
+    res.status(500).json({ message: 'Server error creating shelf comment' });
   }
 }
 

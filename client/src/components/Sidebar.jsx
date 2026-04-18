@@ -82,15 +82,6 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="theme-panel rounded-[28px] p-4 mb-4">
-          <div className="theme-panel-content space-y-3">
-            <p className="theme-subtle-label font-semibold">Others</p>
-            <div className="flex items-center gap-3 text-sm theme-muted"><User size={16} /> Profile</div>
-            <div className="flex items-center gap-3 text-sm theme-muted"><BookOpen size={16} /> Shelves</div>
-            <div className="flex items-center gap-3 text-sm theme-muted"><Trash2 size={16} /> Compost</div>
-          </div>
-        </div>
-
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-[#5f7498] hover:bg-white/50 hover:text-[#e8617a] transition-colors w-full"

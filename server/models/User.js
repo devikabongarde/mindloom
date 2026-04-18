@@ -6,8 +6,11 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     phone: { type: String, default: null },
+    avatarUrl: { type: String, default: null },
     defaultShelfId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shelf', default: null },
     curatorArchetype: { type: String, default: null },
+    curatorArchetypeName: { type: String, default: null, trim: true },
+    curatorArchetypeDescription: { type: String, default: null, trim: true },
     vibeStats: {
       Educational: { type: Number, default: 0 },
       Chaotic: { type: Number, default: 0 },
