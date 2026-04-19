@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, BookOpen, Trash2, User, Users, Bell, LogOut, Network, GraduationCap, Compass, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Home, BookOpen, Trash2, User, Bell, LogOut, Network, GraduationCap, Compass, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 
@@ -9,7 +9,7 @@ const navItems = [
   { to: '/shelf',           icon: BookOpen,       label: 'My Shelf'       },
   // { to: '/discover',        icon: Compass,        label: 'Discover'       },
   // { to: '/study',           icon: GraduationCap,  label: 'Study Mode'     },
-  { to: '/social',          icon: Users,          label: 'Social'         },
+  { to: '/discover',        icon: Compass,        label: 'Discover'       },
   { to: '/knowledge-graph', icon: Network,        label: 'Knowledge Graph'},
   { to: '/compost',         icon: Trash2,         label: 'Compost Heap'   },
 ];

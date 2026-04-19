@@ -4,6 +4,7 @@ import {
   getSocialFeed,
   discoverUsers,
   getFriendsState,
+  getUserProfile,
   getNotifications,
   getShelfComments,
   sendFriendRequest,
@@ -18,6 +19,7 @@ const router = Router();
 
 router.get('/feed', authMiddleware, getSocialFeed);
 router.get('/users', authMiddleware, discoverUsers);
+router.get('/users/:userId', authMiddleware, getUserProfile);
 router.get('/friends', authMiddleware, getFriendsState);
 router.get('/notifications', authMiddleware, getNotifications);
 router.get('/shelves/:shelfId/comments', authMiddleware, getShelfComments);

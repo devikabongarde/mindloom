@@ -3,6 +3,7 @@ import Notification from '../models/Notification.js';
 import Shelf from '../models/Shelf.js';
 import ShelfComment from '../models/ShelfComment.js';
 import User from '../models/User.js';
+import { computeArchetype } from '../utils/curator.util.js';
 
 function toSet(values = []) {
   return new Set(values.map((v) => String(v)));
@@ -29,6 +30,19 @@ function popularityScore(link) {
 
 function shelfPopularityScore(stats) {
   return stats.totalReactions * 2 + stats.totalLinks + stats.freshness;
+}
+
+function buildCuratorArchetype(user) {
+  const computed = computeArchetype(user?.vibeStats || {});
+
+  const archetypeName = typeof user?.curatorArchetypeName === 'string' ? user.curatorArchetypeName.trim() : '';
+  const archetypeDescription = typeof user?.curatorArchetypeDescription === 'string' ? user.curatorArchetypeDescription.trim() : '';
+
+  return {
+    name: archetypeName || computed.name,
+    description: archetypeDescription || computed.description,
+    isCustom: Boolean(archetypeName || archetypeDescription),
+  };
 }
 
 export async function getSocialFeed(req, res) {
@@ -182,6 +196,48 @@ export async function getFriendsState(req, res) {
   } catch (err) {
     console.error('getFriendsState error:', err.message);
     res.status(500).json({ message: 'Server error fetching friends' });
+  }
+}
+
+export async function getUserProfile(req, res) {
+  try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ message: 'userId is required' });
+
+    const [me, target] = await Promise.all([
+      User.findById(req.user.id).lean(),
+      User.findById(userId).populate('defaultShelfId', 'name').lean(),
+    ]);
+
+    if (!me || !target) return res.status(404).json({ message: 'User not found' });
+
+    const isSelf = String(me._id) === String(target._id);
+    const isFriend = isSelf || (me.friends || []).some((friendId) => String(friendId) === String(target._id));
+    if (!isFriend) {
+      return res.status(403).json({ message: 'You can only view profiles for yourself and your friends' });
+    }
+
+    const defaultShelfId = target.defaultShelfId?._id || target.defaultShelfId || null;
+    const defaultShelfName = target.defaultShelfId?.name || 'No default shelf';
+
+    const friendCount = Array.isArray(target.friends) ? target.friends.length : 0;
+
+    res.json({
+      _id: target._id,
+      name: target.name,
+      email: target.email,
+      telegramId: target.telegramId,
+      avatarUrl: target.avatarUrl,
+      defaultShelfId,
+      defaultShelfName,
+      vibeStats: target.vibeStats || {},
+      curatorArchetype: buildCuratorArchetype(target),
+      friendCount,
+      isSelf,
+    });
+  } catch (err) {
+    console.error('getUserProfile error:', err.message);
+    res.status(500).json({ message: 'Server error fetching user profile' });
   }
 }
 

@@ -625,7 +625,7 @@ export default function Dashboard() {
               <div className="theme-card-content space-y-4">
                 <p className="theme-subtle-label font-semibold">Quick jump</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <Link to="/social" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Social</Link>
+                  <Link to="/discover" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Discover</Link>
                   <Link to="/notifications" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Alerts</Link>
                   <Link to="/profile" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Profile</Link>
                   <Link to="/knowledge-graph" className="theme-panel rounded-2xl px-3 py-3 text-sm font-semibold text-[#20314d] hover:bg-white/85 transition">Graph</Link>

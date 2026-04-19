@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { ArrowUpRight, GitFork, Plus, Star } from 'lucide-react';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowUpRight, GitFork, MessageCircle, Plus, Send, Star, Users } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -15,6 +15,7 @@ function getDomain(url) {
 
 export default function Social() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, login } = useAuth();
   const [feed, setFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(true);
@@ -33,6 +34,9 @@ export default function Social() {
   const [commentsByShelfId, setCommentsByShelfId] = useState({});
   const [commentTextByShelfId, setCommentTextByShelfId] = useState({});
   const [commentLoadingByShelfId, setCommentLoadingByShelfId] = useState({});
+  const [selectedFriendId, setSelectedFriendId] = useState('');
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatMessages, setChatMessages] = useState([]);
 
   const refreshFriends = async () => {
     const { data } = await api.get('/api/social/friends');
@@ -97,6 +101,53 @@ export default function Social() {
   const friendIdSet = useMemo(() => new Set(friends.map((f) => String(f._id))), [friends]);
   const incomingIdSet = useMemo(() => new Set(incoming.map((u) => String(u._id))), [incoming]);
   const sentIdSet = useMemo(() => new Set(sent.map((u) => String(u._id))), [sent]);
+  const selectedFriend = useMemo(
+    () => friends.find((friend) => String(friend._id) === String(selectedFriendId)) || null,
+    [friends, selectedFriendId]
+  );
+
+  const chatKey = (friendId) => {
+    const myId = String(user?._id || user?.id || 'me');
+    return `shelflife-chat:${[myId, String(friendId)].sort().join(':')}`;
+  };
+
+  const loadChatMessages = (friendId) => {
+    try {
+      const raw = window.localStorage.getItem(chatKey(friendId));
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveChatMessages = (friendId, nextMessages) => {
+    try {
+      window.localStorage.setItem(chatKey(friendId), JSON.stringify(nextMessages));
+    } catch {
+      // local storage is best-effort only
+    }
+  };
+
+  useEffect(() => {
+    const selectedFromUrl = searchParams.get('chat') || '';
+    if (selectedFromUrl && friends.some((friend) => String(friend._id) === String(selectedFromUrl))) {
+      setSelectedFriendId(String(selectedFromUrl));
+      return;
+    }
+    if (!selectedFriendId && friends.length > 0) {
+      setSelectedFriendId(String(friends[0]._id));
+    }
+  }, [friends, searchParams, selectedFriendId]);
+
+  useEffect(() => {
+    if (!selectedFriendId) {
+      setChatMessages([]);
+      return;
+    }
+
+    setChatMessages(loadChatMessages(selectedFriendId));
+  }, [selectedFriendId]);
 
   const handleRequest = async (userId) => {
     await api.post('/api/social/friends/request', { userId });
@@ -111,6 +162,11 @@ export default function Social() {
   const handleRemove = async (userId) => {
     await api.post('/api/social/friends/remove', { userId });
     await refreshFriends();
+    if (String(selectedFriendId) === String(userId)) {
+      setSelectedFriendId('');
+      setChatMessages([]);
+      setChatDraft('');
+    }
   };
 
   const sortShelves = (items) => [...items].sort((a, b) => {
@@ -204,6 +260,31 @@ export default function Social() {
     }
   };
 
+  const openChat = (friendId) => {
+    setSelectedFriendId(String(friendId));
+    navigate(`/discover?chat=${encodeURIComponent(String(friendId))}`, { replace: true });
+  };
+
+  const handleSendChat = () => {
+    const text = chatDraft.trim();
+    if (!text || !selectedFriendId) return;
+
+    const message = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      senderId: String(user?._id || user?.id || 'me'),
+      senderName: user?.name || 'You',
+      text,
+      createdAt: new Date().toISOString(),
+    };
+
+    setChatMessages((prev) => {
+      const next = [...prev, message];
+      saveChatMessages(selectedFriendId, next);
+      return next;
+    });
+    setChatDraft('');
+  };
+
   const actionFor = (user) => {
     const id = String(user._id);
     if (friendIdSet.has(id)) return { label: 'Friends', action: () => handleRemove(id), style: 'theme-button-secondary' };
@@ -257,9 +338,9 @@ export default function Social() {
         <section className="theme-card rounded-[28px] p-6">
           <div className="theme-card-content flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="theme-subtle-label font-semibold">Social</p>
-              <h1 className="theme-hero-title text-3xl md:text-4xl font-bold">Community Feed + Friends</h1>
-              <p className="theme-muted mt-2 max-w-2xl">Explore popular public shelves, discover people with similar interests, and grow your network.</p>
+              <p className="theme-subtle-label font-semibold">Discover</p>
+              <h1 className="theme-hero-title text-3xl md:text-4xl font-bold">Public shelves, people, and chats</h1>
+              <p className="theme-muted mt-2 max-w-2xl">Explore popular public shelves, find friends, and jump into a quick chat right here.</p>
             </div>
             <div className="theme-panel rounded-2xl px-4 py-3 min-w-[250px]">
               <p className="text-xs theme-muted uppercase tracking-[0.18em]">Create New Shelf</p>
@@ -293,7 +374,7 @@ export default function Social() {
           </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_360px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_380px]">
           <section className="theme-card rounded-[28px] p-5 md:p-6">
             <div className="theme-card-content">
               <div className="flex items-center justify-between gap-3 mb-4">
@@ -409,7 +490,13 @@ export default function Social() {
 
           <section className="theme-card rounded-[28px] p-5 md:p-6">
             <div className="theme-card-content flex flex-col gap-4">
-              <h2 className="text-xl font-bold text-[#20314d]">Friends</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold text-[#20314d]">Friends</h2>
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#5f7498] bg-white/70 border border-white/70 rounded-full px-3 py-1">
+                  <Users size={13} />
+                  {friends.length}
+                </span>
+              </div>
 
               <div className="theme-panel rounded-2xl px-4 py-3">
                 <input
@@ -426,6 +513,93 @@ export default function Social() {
                 <RouterLink to="/notifications" className="theme-link text-xs font-semibold mt-2 inline-block">
                   Open Notifications
                 </RouterLink>
+              </div>
+
+              <div className="bg-white/45 rounded-2xl p-3 border border-white/60">
+                <p className="theme-subtle-label font-semibold mb-2">Chat with a friend</p>
+                {friends.length === 0 ? (
+                  <p className="text-sm theme-muted">Add a friend first, then start chatting here.</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      {friends.map((friend) => {
+                        const isActive = String(friend._id) === String(selectedFriendId);
+                        return (
+                          <button
+                            key={friend._id}
+                            onClick={() => openChat(friend._id)}
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold border transition ${isActive ? 'bg-[#20314d] text-white border-[#20314d]' : 'bg-white/75 text-[#20314d] border-white/80 hover:bg-white'}`}
+                          >
+                            {friend.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="rounded-2xl bg-white/70 border border-white/70 p-3 flex flex-col gap-3">
+                      {selectedFriend ? (
+                        <>
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-[#20314d]">Chatting with {selectedFriend.name}</p>
+                              <p className="text-[11px] theme-muted">Saved locally in this browser for now.</p>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/profile`) }
+                              className="text-xs font-semibold text-[#F4845F] hover:underline"
+                            >
+                              View profile
+                            </button>
+                          </div>
+
+                          <div className="max-h-56 overflow-y-auto flex flex-col gap-2 pr-1">
+                            {chatMessages.length === 0 ? (
+                              <div className="rounded-xl bg-white/60 border border-white/70 p-3">
+                                <p className="text-sm font-semibold text-[#20314d]">Say hi 👋</p>
+                                <p className="text-xs theme-muted mt-1">Start a conversation about a shelf, a link, or anything fun.</p>
+                              </div>
+                            ) : (
+                              chatMessages.map((message) => {
+                                const mine = String(message.senderId) === String(user?._id || user?.id || 'me');
+                                return (
+                                  <div key={message.id} className={`max-w-[86%] rounded-2xl px-3 py-2 ${mine ? 'ml-auto bg-gradient-to-r from-[#F4845F] to-[#E8617A] text-white' : 'bg-white/80 text-[#20314d] border border-white/70'}`}>
+                                    <p className={`text-[11px] font-semibold ${mine ? 'text-white/85' : 'theme-muted'}`}>{mine ? 'You' : selectedFriend.name}</p>
+                                    <p className="text-sm leading-relaxed break-words">{message.text}</p>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={chatDraft}
+                              onChange={(e) => setChatDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSendChat();
+                                }
+                              }}
+                              placeholder={`Message ${selectedFriend.name}...`}
+                              className="flex-1 rounded-xl bg-white/85 border border-white/80 px-3 py-2 text-sm text-[#20314d] placeholder:text-[#8aa0c1] outline-none"
+                            />
+                            <button
+                              onClick={handleSendChat}
+                              disabled={!chatDraft.trim()}
+                              className="theme-button rounded-xl px-3 py-2 text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-70"
+                            >
+                              <Send size={14} />
+                              Send
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm theme-muted">Select a friend above to start chatting.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="bg-white/45 rounded-2xl p-3 border border-white/60">
