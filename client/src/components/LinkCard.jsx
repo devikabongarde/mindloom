@@ -277,7 +277,7 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
   return (
     <>
       <div
-        className={`relative rounded-[20px] overflow-visible flex flex-col gap-0
+        className={`link-card-animate relative rounded-[20px] overflow-visible flex flex-col gap-0
           bg-white/45 backdrop-blur-xl border border-white/60
           shadow-lg hover:shadow-xl hover:-translate-y-1
           transition-all duration-300 ${isAiEnriching ? 'cursor-wait' : 'cursor-pointer'} group
