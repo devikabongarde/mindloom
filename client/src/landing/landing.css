@@ -4,7 +4,7 @@
   --bg: #f9fbff;
   --charcoal: #e7efff;
   --ink: #20314d;
-  --muted: #5f7498;
+  --muted: #4b607f;
   --line: rgba(255, 255, 255, 0.72);
   --glass: rgba(255, 255, 255, 0.56);
   --blue-glow: rgba(123, 172, 255, 0.28);
@@ -199,7 +199,7 @@ body.landing-theme::after {
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.28em;
-  color: #6d82a7;
+  color: #5b7196;
   font-size: 0.74rem;
 }
 

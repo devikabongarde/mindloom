@@ -91,6 +91,7 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
   const decay = getDecayMetrics(liveMinutesIdle);
   const status = statusConfig[decay.phase] || statusConfig.fresh;
   const screenshotSrc = link.screenshot ? `${SERVER_URL}${link.screenshot}` : null;
+  const isAiEnriching = !String(link.summary || '').trim();
 
   const cardVisualStyle = {
     '--decay-opacity': `${Math.max(0.45, 1 - decay.progress * 0.42)}`,
@@ -274,11 +275,14 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
         className={`relative rounded-[20px] overflow-visible flex flex-col gap-0
           bg-white/45 backdrop-blur-xl border border-white/60
           shadow-lg hover:shadow-xl hover:-translate-y-1
-          transition-all duration-300 cursor-pointer group
+          transition-all duration-300 ${isAiEnriching ? 'cursor-wait' : 'cursor-pointer'} group
           ${activePopover ? 'z-[120]' : 'z-0'}`}
         style={cardVisualStyle}
-        onClick={() => setShowDetail(true)}
+        onClick={() => {
+          if (!isAiEnriching) setShowDetail(true);
+        }}
         onKeyDown={(e) => {
+          if (isAiEnriching) return;
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setShowDetail(true);
@@ -287,18 +291,34 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
         role="button"
         tabIndex={0}
       >
-        {/* Screenshot thumbnail */}
-        {screenshotSrc && (
-          <div className="h-32 w-full overflow-hidden bg-white/20">
-            <img
-              src={screenshotSrc} alt={link.title}
-              className="w-full h-full object-cover object-top"
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-          </div>
-        )}
+        <div className="link-enriching-overlay" aria-hidden="true">
+          <span className="link-enriching-blob link-enriching-blob-a" />
+          <span className="link-enriching-blob link-enriching-blob-b" />
+          <span className="link-enriching-blob link-enriching-blob-c" />
+        </div>
 
-        <div className="flex flex-col gap-3 p-5">
+        {isAiEnriching ? (
+          <div className="link-card-loading-shell">
+            <div className="link-card-loading-core">
+              <span className="link-card-loading-ring" aria-hidden="true" />
+              <p className="link-card-loading-title">Enriching with AI...</p>
+              <p className="link-card-loading-subtitle">Analyzing the source, building summary, and tagging vibes.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Screenshot thumbnail */}
+            {screenshotSrc && (
+              <div className="h-32 w-full overflow-hidden bg-white/20">
+                <img
+                  src={screenshotSrc} alt={link.title}
+                  className="w-full h-full object-cover object-top"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 p-5">
           {/* Title */}
           <h3 className="font-bold text-[#1A1A2E] text-base leading-snug line-clamp-2 group-hover:text-[#F4845F] transition-colors">
             {link.title}
@@ -573,7 +593,9 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
               )}
             </div>
           </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {showDetail && <LinkDetailModal link={link} onClose={() => setShowDetail(false)} />}

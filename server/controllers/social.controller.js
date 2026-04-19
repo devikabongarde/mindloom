@@ -294,8 +294,18 @@ export async function getNotifications(req, res) {
         .lean(),
     ]);
 
+    const pendingRequesterIds = new Set(
+      (me?.friendRequestsReceived || []).map((u) => String(u?._id || ''))
+    );
+
+    const validStoredNotifications = storedNotifications.filter((n) => {
+      if (n.type !== 'friend_request') return true;
+      const requesterId = String(n.meta?.requesterUserId || n.actorId?._id || n.actorId || '');
+      return pendingRequesterIds.has(requesterId);
+    });
+
     const existingRequesters = new Set(
-      storedNotifications
+      validStoredNotifications
         .filter((n) => n.type === 'friend_request' && !n.isRead)
         .map((n) => String(n.meta?.requesterUserId || n.actorId?._id || n.actorId || ''))
     );
@@ -314,7 +324,7 @@ export async function getNotifications(req, res) {
         synthetic: true,
       }));
 
-    const combined = [...storedNotifications, ...fallbackRequestNotifications]
+    const combined = [...validStoredNotifications, ...fallbackRequestNotifications]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, limit);
 

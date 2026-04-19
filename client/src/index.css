@@ -7,7 +7,7 @@
 :root {
   --bg: #f9fbff;
   --ink: #20314d;
-  --muted: #5f7498;
+  --muted: #4b607f;
   --line: rgba(255, 255, 255, 0.72);
   --glass: rgba(255, 255, 255, 0.56);
   --blue-glow: rgba(123, 172, 255, 0.28);
@@ -150,13 +150,17 @@ body::after {
 .theme-modal::after {
   content: '';
   position: absolute;
-  inset: -22% -15%;
+  inset: -30% -20%;
   border-radius: inherit;
   background:
+    radial-gradient(circle at 18% 26%, rgba(176, 217, 255, 0.3), rgba(176, 217, 255, 0) 34%),
+    radial-gradient(circle at 82% 24%, rgba(255, 200, 224, 0.24), rgba(255, 200, 224, 0) 30%),
+    radial-gradient(circle at 48% 86%, rgba(186, 242, 227, 0.2), rgba(186, 242, 227, 0) 35%),
     linear-gradient(108deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0) 36%),
     radial-gradient(circle at 78% 72%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
-  opacity: 0.7;
-  transform: rotate(6deg);
+  opacity: 0.78;
+  transform: rotate(6deg) translate3d(0, 0, 0);
+  animation: themeCardBlobFloat 12s ease-in-out infinite alternate;
   pointer-events: none;
 }
 
@@ -234,8 +238,97 @@ body::after {
 .theme-subtle-label {
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  color: #6d82a7;
+  color: #5b7196;
   font-size: 0.72rem;
+}
+
+.text-\[\#6B7280\],
+.text-\[\#5f7498\] {
+  color: #4f6282 !important;
+}
+
+.link-enriching-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+  opacity: 0.95;
+}
+
+.link-enriching-blob {
+  position: absolute;
+  width: 52%;
+  aspect-ratio: 1;
+  border-radius: 44% 56% 58% 42% / 42% 46% 54% 58%;
+  filter: blur(12px);
+  animation: linkBlobDrift 5.4s ease-in-out infinite;
+}
+
+.link-enriching-blob-a {
+  left: -14%;
+  top: -18%;
+  background: radial-gradient(circle at 34% 36%, rgba(173, 220, 255, 0.55), rgba(173, 220, 255, 0));
+}
+
+.link-enriching-blob-b {
+  right: -16%;
+  top: 12%;
+  background: radial-gradient(circle at 46% 40%, rgba(255, 197, 220, 0.5), rgba(255, 197, 220, 0));
+  animation-delay: -1.8s;
+}
+
+.link-enriching-blob-c {
+  left: 22%;
+  bottom: -22%;
+  background: radial-gradient(circle at 50% 35%, rgba(179, 241, 224, 0.46), rgba(179, 241, 224, 0));
+  animation-delay: -3.3s;
+}
+
+.link-card-loading-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 290px;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.link-card-loading-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.65rem;
+  max-width: 240px;
+}
+
+.link-card-loading-ring {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 2px solid rgba(130, 157, 201, 0.28);
+  border-top-color: rgba(90, 127, 183, 0.8);
+  border-right-color: rgba(232, 137, 170, 0.7);
+  animation: linkLoaderSpin 0.9s linear infinite;
+}
+
+.link-card-loading-title {
+  margin: 0;
+  font-weight: 700;
+  color: #2b4467;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.link-card-loading-subtitle {
+  margin: 0;
+  color: #4f6282;
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 @keyframes panoramicGlow {
@@ -268,5 +361,39 @@ body::after {
   }
   100% {
     opacity: calc(var(--decay-opacity, 1) - 0.08);
+  }
+}
+
+@keyframes themeCardBlobFloat {
+  0% {
+    transform: rotate(5deg) translate3d(-5px, -4px, 0) scale(1);
+  }
+  50% {
+    transform: rotate(7deg) translate3d(8px, 6px, 0) scale(1.03);
+  }
+  100% {
+    transform: rotate(4deg) translate3d(-7px, 9px, 0) scale(0.98);
+  }
+}
+
+@keyframes linkBlobDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(10px, -7px, 0) scale(1.04) rotate(5deg);
+  }
+  66% {
+    transform: translate3d(-9px, 9px, 0) scale(0.96) rotate(-5deg);
+  }
+}
+
+@keyframes linkLoaderSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
