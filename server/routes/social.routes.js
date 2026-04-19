@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authMiddleware from '../middleware/auth.middleware.js';
 import {
   getSocialFeed,
+  searchPublicShelves,
   discoverUsers,
   getFriendsState,
   getUserProfile,
@@ -18,6 +19,7 @@ import {
 const router = Router();
 
 router.get('/feed', authMiddleware, getSocialFeed);
+router.get('/search-shelves', authMiddleware, searchPublicShelves);
 router.get('/users', authMiddleware, discoverUsers);
 router.get('/users/:userId', authMiddleware, getUserProfile);
 router.get('/friends', authMiddleware, getFriendsState);

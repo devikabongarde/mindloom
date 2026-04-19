@@ -97,6 +97,74 @@ function applyIdf(termVec, idfMap) {
   return out;
 }
 
+function rankLinksBySemanticQuery(links = [], queryText = '', limit = 8) {
+  const safeLimit = Math.min(20, Math.max(1, Number.parseInt(String(limit || 8), 10)));
+  const query = String(queryText || '').trim();
+  if (!query || links.length === 0) return [];
+
+  const queryTokens = tokenize(query);
+  const expandedQueryTokens = expandQueryTokens(queryTokens);
+  if (expandedQueryTokens.length === 0) return [];
+
+  const rawLinkVectors = links.map((link) => weightedTermVector(link.toObject ? link.toObject() : link));
+
+  const df = new Map();
+  rawLinkVectors.forEach((vec) => {
+    for (const term of vec.keys()) {
+      df.set(term, (df.get(term) || 0) + 1);
+    }
+  });
+
+  const docCount = rawLinkVectors.length;
+  const idfMap = new Map();
+  for (const [term, freq] of df.entries()) {
+    idfMap.set(term, Math.log((docCount + 1) / (freq + 1)) + 1);
+  }
+
+  const queryVec = new Map();
+  expandedQueryTokens.forEach((token) => {
+    queryVec.set(token, (queryVec.get(token) || 0) + 1.5);
+  });
+  const weightedQueryVec = applyIdf(queryVec, idfMap);
+  const phrase = normalizeText(query);
+
+  const scored = links.map((link, index) => {
+    const obj = link.toObject ? link.toObject() : link;
+    const vector = applyIdf(rawLinkVectors[index], idfMap);
+    const cosine = cosineSimilarity(weightedQueryVec, vector);
+
+    const titleText = normalizeText(obj.title || '');
+    const summaryText = normalizeText(obj.summary || '');
+    const urlText = normalizeText(obj.url || '');
+
+    let bonus = 0;
+    if (phrase && titleText.includes(phrase)) bonus += 0.28;
+    if (phrase && summaryText.includes(phrase)) bonus += 0.2;
+    if (phrase && urlText.includes(phrase)) bonus += 0.1;
+
+    expandedQueryTokens.forEach((token) => {
+      if (titleText.includes(token)) bonus += 0.03;
+      if (summaryText.includes(token)) bonus += 0.02;
+    });
+
+    const minutesIdle = computeStatus(obj.lastClickedAt).minutesIdle;
+    const recencyBoost = Math.max(0, 0.08 - Math.min(minutesIdle, 240) / 4000);
+
+    const score = cosine + bonus + recencyBoost;
+    return {
+      ...obj,
+      ...computeStatus(obj.lastClickedAt),
+      _score: score,
+    };
+  });
+
+  return scored
+    .filter((item) => item._score > 0.06)
+    .sort((a, b) => b._score - a._score)
+    .slice(0, safeLimit)
+    .map(({ _score, ...rest }) => rest);
+}
+
 export const searchShelfLinks = async (req, res) => {
   try {
     const { shelfId, q } = req.query;
@@ -109,77 +177,48 @@ export const searchShelfLinks = async (req, res) => {
     const queryText = String(q).trim();
     if (!queryText) return res.json([]);
 
+    const shelf = await Shelf.findById(shelfId).select('ownerId members isPublic').lean();
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isMember = Array.isArray(shelf.members) && shelf.members.some((id) => String(id) === String(req.user.id));
+    const isOwner = String(shelf.ownerId || '') === String(req.user.id);
+    if (!shelf.isPublic && !isMember && !isOwner) {
+      return res.status(403).json({ message: 'You do not have access to this shelf' });
+    }
+
     const links = await Link.find({ shelfId }).sort({ createdAt: -1 }).limit(300).populate('addedBy', 'name');
     if (links.length === 0) return res.json([]);
 
-    const queryTokens = tokenize(queryText);
-    const expandedQueryTokens = expandQueryTokens(queryTokens);
-    if (expandedQueryTokens.length === 0) return res.json([]);
-
-    const rawLinkVectors = links.map((link) => weightedTermVector(link.toObject()));
-
-    // Build document frequencies for IDF.
-    const df = new Map();
-    rawLinkVectors.forEach((vec) => {
-      for (const term of vec.keys()) {
-        df.set(term, (df.get(term) || 0) + 1);
-      }
-    });
-
-    const docCount = rawLinkVectors.length;
-    const idfMap = new Map();
-    for (const [term, freq] of df.entries()) {
-      idfMap.set(term, Math.log((docCount + 1) / (freq + 1)) + 1);
-    }
-
-    const queryVec = new Map();
-    expandedQueryTokens.forEach((token) => {
-      queryVec.set(token, (queryVec.get(token) || 0) + 1.5);
-    });
-    const weightedQueryVec = applyIdf(queryVec, idfMap);
-
-    const phrase = normalizeText(queryText);
-
-    const scored = links.map((link, index) => {
-      const obj = link.toObject();
-      const vector = applyIdf(rawLinkVectors[index], idfMap);
-      const cosine = cosineSimilarity(weightedQueryVec, vector);
-
-      const titleText = normalizeText(obj.title || '');
-      const summaryText = normalizeText(obj.summary || '');
-      const urlText = normalizeText(obj.url || '');
-
-      let bonus = 0;
-      if (phrase && titleText.includes(phrase)) bonus += 0.28;
-      if (phrase && summaryText.includes(phrase)) bonus += 0.2;
-      if (phrase && urlText.includes(phrase)) bonus += 0.1;
-
-      expandedQueryTokens.forEach((token) => {
-        if (titleText.includes(token)) bonus += 0.03;
-        if (summaryText.includes(token)) bonus += 0.02;
-      });
-
-      const minutesIdle = computeStatus(obj.lastClickedAt).minutesIdle;
-      const recencyBoost = Math.max(0, 0.08 - Math.min(minutesIdle, 240) / 4000);
-
-      const score = cosine + bonus + recencyBoost;
-      return {
-        ...obj,
-        ...computeStatus(obj.lastClickedAt),
-        _score: score,
-      };
-    });
-
-    const result = scored
-      .filter((item) => item._score > 0.06)
-      .sort((a, b) => b._score - a._score)
-      .slice(0, limit)
-      .map(({ _score, ...rest }) => rest);
-
+    const result = rankLinksBySemanticQuery(links, queryText, limit);
     res.json(result);
   } catch (err) {
     console.error('searchShelfLinks error:', err.message);
     res.status(500).json({ message: 'Server error searching links' });
+  }
+};
+
+// GET /api/links/search/mine?q=...
+export const searchMyShelfLinks = async (req, res) => {
+  try {
+    const queryText = String(req.query.q || '').trim();
+    const limit = Math.min(20, Math.max(1, Number.parseInt(req.query.limit || '8', 10)));
+    if (!queryText) return res.json([]);
+
+    const shelves = await Shelf.find({ members: req.user.id }).select('_id').lean();
+    const shelfIds = shelves.map((s) => s._id);
+    if (shelfIds.length === 0) return res.json([]);
+
+    const links = await Link.find({ shelfId: { $in: shelfIds } })
+      .sort({ createdAt: -1 })
+      .limit(600)
+      .populate('addedBy', 'name');
+    if (links.length === 0) return res.json([]);
+
+    const result = rankLinksBySemanticQuery(links, queryText, limit);
+    res.json(result);
+  } catch (err) {
+    console.error('searchMyShelfLinks error:', err.message);
+    res.status(500).json({ message: 'Server error searching your shelves' });
   }
 };
 

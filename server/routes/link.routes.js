@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth.middleware.js';
-import { createLink, getShelfLinks, getCompostLinks, clickLink, reactToLink, searchShelfLinks, deleteLink, getLinkSuggestions, addLinkSuggestion, deleteLinkSuggestion } from '../controllers/link.controller.js';
+import { createLink, getShelfLinks, getCompostLinks, clickLink, reactToLink, searchShelfLinks, searchMyShelfLinks, deleteLink, getLinkSuggestions, addLinkSuggestion, deleteLinkSuggestion } from '../controllers/link.controller.js';
 import { getContextFeed } from '../controllers/context.controller.js';
 
 const router = Router();
 
 router.post('/',                authMiddleware, createLink);
+router.get('/search/mine',      authMiddleware, searchMyShelfLinks);
 router.get('/search',           authMiddleware, searchShelfLinks);
 router.get('/shelf/:id',        authMiddleware, getShelfLinks);
 router.get('/compost/:shelfId', authMiddleware, getCompostLinks);

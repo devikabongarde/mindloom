@@ -108,12 +108,6 @@ export default function Dashboard() {
   }, [allShelfIds]);
 
   useEffect(() => {
-    if (allShelfIds.length === 0) {
-      setSearchResults([]);
-      setSearchLoading(false);
-      return;
-    }
-
     const query = searchQuery.trim();
     if (!query) {
       setSearchResults([]);
@@ -124,39 +118,20 @@ export default function Dashboard() {
     let cancelled = false;
     setSearchLoading(true);
 
-    const timer = window.setTimeout(() => {
-      const normalizedQuery = query.toLowerCase();
-      const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
-
-      const scored = dashboardLinks
-        .map((link) => {
-          const haystack = [
-            link.title || '',
-            link.summary || '',
-            link.url || '',
-            Array.isArray(link.vibes) ? link.vibes.join(' ') : '',
-          ].join(' ').toLowerCase();
-
-          let score = 0;
-          if (haystack.includes(normalizedQuery)) score += 4;
-          tokens.forEach((token) => {
-            if (haystack.includes(token)) score += 1;
-          });
-
-          return {
-            link,
-            score,
-            recency: toTime(link.lastClickedAt || link.createdAt),
-          };
-        })
-        .filter((item) => item.score > 0)
-        .sort((a, b) => (b.score - a.score) || (b.recency - a.recency))
-        .slice(0, 6)
-        .map((item) => item.link);
-
-      if (!cancelled) {
-        setSearchResults(scored);
-        setSearchLoading(false);
+    const timer = window.setTimeout(async () => {
+      try {
+        const { data } = await api.get('/api/links/search/mine', {
+          params: { q: query, limit: 6 },
+        });
+        if (!cancelled) {
+          setSearchResults(Array.isArray(data) ? data : []);
+          setSearchLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setSearchResults([]);
+          setSearchLoading(false);
+        }
       }
     }, 260);
 
@@ -164,7 +139,7 @@ export default function Dashboard() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [searchQuery, allShelfIds, dashboardLinks]);
+  }, [searchQuery]);
 
   useEffect(() => {
     let cancelled = false;

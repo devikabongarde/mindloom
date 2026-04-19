@@ -31,6 +31,8 @@ export default function Social() {
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverUsers, setDiscoverUsers] = useState([]);
   const [shelfQuery, setShelfQuery] = useState('');
+  const [shelfSearchLoading, setShelfSearchLoading] = useState(false);
+  const [shelfSearchResults, setShelfSearchResults] = useState([]);
   const [openDiscussionByShelfId, setOpenDiscussionByShelfId] = useState({});
   const [commentsByShelfId, setCommentsByShelfId] = useState({});
   const [commentTextByShelfId, setCommentTextByShelfId] = useState({});
@@ -105,22 +107,37 @@ export default function Social() {
   const friendIdSet = useMemo(() => new Set(friends.map((f) => String(f._id))), [friends]);
   const incomingIdSet = useMemo(() => new Set(incoming.map((u) => String(u._id))), [incoming]);
   const sentIdSet = useMemo(() => new Set(sent.map((u) => String(u._id))), [sent]);
-  const filteredFeed = useMemo(() => {
-    const query = shelfQuery.trim().toLowerCase();
-    if (!query) return feed;
+  const visibleFeed = shelfQuery.trim() ? shelfSearchResults : feed;
 
-    return feed.filter((item) => {
-      const shelfName = String(item?.name || '').toLowerCase();
-      const ownerName = String(item?.ownerName || '').toLowerCase();
-      const previewText = Array.isArray(item?.previewLinks)
-        ? item.previewLinks
-            .map((preview) => `${preview?.title || ''} ${preview?.url || ''}`.toLowerCase())
-            .join(' ')
-        : '';
+  useEffect(() => {
+    const query = shelfQuery.trim();
+    if (!query) {
+      setShelfSearchResults([]);
+      setShelfSearchLoading(false);
+      return;
+    }
 
-      return shelfName.includes(query) || ownerName.includes(query) || previewText.includes(query);
-    });
-  }, [feed, shelfQuery]);
+    let cancelled = false;
+    setShelfSearchLoading(true);
+
+    const timer = window.setTimeout(() => {
+      api.get('/api/social/search-shelves', { params: { q: query, limit: 18 } })
+        .then(({ data }) => {
+          if (!cancelled) setShelfSearchResults(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          if (!cancelled) setShelfSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setShelfSearchLoading(false);
+        });
+    }, 260);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [shelfQuery]);
 
   const handleRequest = async (userId) => {
     await api.post('/api/social/friends/request', { userId });
@@ -156,6 +173,11 @@ export default function Social() {
           starredByMe: data.starred,
         };
       })));
+      setShelfSearchResults((prev) => prev.map((item) => (
+        item._id !== shelfId
+          ? item
+          : { ...item, starCount: data.starCount, starredByMe: data.starred }
+      )));
     } catch {
       alert('Could not update shelf star.');
     }
@@ -217,6 +239,11 @@ export default function Social() {
       setCommentTextByShelfId((prev) => ({ ...prev, [shelfId]: '' }));
 
       setFeed((prev) => prev.map((item) => (
+        item._id === shelfId
+          ? { ...item, commentsCount: (item.commentsCount || 0) + 1 }
+          : item
+      )));
+      setShelfSearchResults((prev) => prev.map((item) => (
         item._id === shelfId
           ? { ...item, commentsCount: (item.commentsCount || 0) + 1 }
           : item
@@ -336,13 +363,15 @@ export default function Social() {
 
               {feedLoading ? (
                 <p className="theme-muted text-sm">Loading public feed…</p>
+              ) : shelfSearchLoading ? (
+                <p className="theme-muted text-sm">Searching public shelves by meaning…</p>
               ) : feed.length === 0 ? (
                 <p className="theme-muted text-sm">No public shelves yet. Make a shelf public to appear in the social feed.</p>
-              ) : filteredFeed.length === 0 ? (
+              ) : visibleFeed.length === 0 ? (
                 <p className="theme-muted text-sm">No shelves match your search.</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {filteredFeed.map((item, index) => (
+                  {visibleFeed.map((item, index) => (
                     <div
                       key={item._id}
                       className="bg-white/55 border border-white/70 rounded-2xl p-4 hover:bg-white/85 transition"

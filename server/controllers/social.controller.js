@@ -32,6 +32,95 @@ function shelfPopularityScore(stats) {
   return stats.totalReactions * 2 + stats.totalLinks + stats.freshness;
 }
 
+function normalizeText(value = '') {
+  return String(value)
+    .toLowerCase()
+    .replace(/https?:\/\//g, ' ')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stemToken(token) {
+  if (token.length > 5 && token.endsWith('ing')) return token.slice(0, -3);
+  if (token.length > 4 && token.endsWith('ed')) return token.slice(0, -2);
+  if (token.length > 3 && token.endsWith('s')) return token.slice(0, -1);
+  return token;
+}
+
+function tokenize(value = '') {
+  return normalizeText(value)
+    .split(' ')
+    .map((t) => stemToken(t.trim()))
+    .filter((t) => t.length > 1);
+}
+
+const SYNONYM_MAP = {
+  ai: ['artificial', 'intelligence', 'llm', 'machine', 'learning'],
+  coding: ['programming', 'development', 'software', 'code'],
+  code: ['programming', 'development', 'software', 'coding'],
+  design: ['ux', 'ui', 'interface', 'visual', 'creative'],
+  productivity: ['workflow', 'focus', 'efficiency', 'habit'],
+  startup: ['business', 'product', 'growth', 'founder'],
+  research: ['study', 'paper', 'analysis', 'insight'],
+  tutorial: ['guide', 'howto', 'walkthrough', 'learn'],
+};
+
+function expandQueryTokens(tokens) {
+  const out = new Set(tokens);
+  tokens.forEach((token) => {
+    const related = SYNONYM_MAP[token] || [];
+    related.forEach((r) => out.add(stemToken(r)));
+  });
+  return [...out];
+}
+
+function cosineSimilarity(vecA, vecB) {
+  let dot = 0;
+  let magA = 0;
+  let magB = 0;
+
+  for (const [term, weightA] of vecA.entries()) {
+    const weightB = vecB.get(term) || 0;
+    dot += weightA * weightB;
+    magA += weightA * weightA;
+  }
+
+  for (const weightB of vecB.values()) {
+    magB += weightB * weightB;
+  }
+
+  if (magA === 0 || magB === 0) return 0;
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+function applyIdf(termVec, idfMap) {
+  const out = new Map();
+  for (const [term, tf] of termVec.entries()) {
+    out.set(term, tf * (idfMap.get(term) || 1));
+  }
+  return out;
+}
+
+function weightedShelfVector(shelfItem) {
+  const vec = new Map();
+  const add = (tokens, weight) => {
+    tokens.forEach((token) => {
+      vec.set(token, (vec.get(token) || 0) + weight);
+    });
+  };
+
+  add(tokenize(shelfItem.name || ''), 3);
+  add(tokenize(shelfItem.ownerName || ''), 1);
+  (shelfItem.previewLinks || []).forEach((preview) => {
+    add(tokenize(preview.title || ''), 2);
+    add(tokenize(preview.summary || ''), 1.8);
+    add(tokenize(preview.url || ''), 1);
+  });
+
+  return vec;
+}
+
 function buildCuratorArchetype(user) {
   const computed = computeArchetype(user?.vibeStats || {});
 
@@ -175,6 +264,153 @@ export async function discoverUsers(req, res) {
   } catch (err) {
     console.error('discoverUsers error:', err.message);
     res.status(500).json({ message: 'Server error discovering users' });
+  }
+}
+
+export async function searchPublicShelves(req, res) {
+  try {
+    const queryText = String(req.query.q || '').trim();
+    const limit = Math.min(30, Math.max(3, Number.parseInt(req.query.limit || '18', 10)));
+    if (!queryText) return res.json([]);
+
+    const publicShelves = await Shelf.find({ isPublic: true })
+      .select('_id name ownerId starredBy createdAt updatedAt')
+      .populate('ownerId', 'name')
+      .lean();
+    if (publicShelves.length === 0) return res.json([]);
+
+    const shelfIdList = publicShelves.map((s) => s._id);
+    const links = await Link.find({ shelfId: { $in: shelfIdList } })
+      .sort({ createdAt: -1 })
+      .limit(700)
+      .lean();
+
+    const commentCountsRaw = await ShelfComment.aggregate([
+      { $match: { shelfId: { $in: shelfIdList } } },
+      { $group: { _id: '$shelfId', count: { $sum: 1 } } },
+    ]);
+    const commentCountByShelfId = new Map(commentCountsRaw.map((row) => [String(row._id), row.count]));
+
+    const shelfStats = new Map();
+    for (const shelf of publicShelves) {
+      shelfStats.set(String(shelf._id), {
+        totalLinks: 0,
+        totalReactions: 0,
+        freshness: 0,
+        latestActivityAt: shelf.updatedAt || shelf.createdAt || null,
+        previewLinks: [],
+      });
+    }
+
+    for (const link of links) {
+      const shelfId = String(link.shelfId);
+      const current = shelfStats.get(shelfId);
+      if (!current) continue;
+
+      current.totalLinks += 1;
+      current.totalReactions += Array.isArray(link.reactions) ? link.reactions.length : 0;
+      current.freshness += popularityScore(link);
+
+      if (!current.latestActivityAt || new Date(link.createdAt) > new Date(current.latestActivityAt)) {
+        current.latestActivityAt = link.createdAt;
+      }
+
+      if (current.previewLinks.length < 3) {
+        current.previewLinks.push({
+          _id: link._id,
+          title: link.title,
+          url: link.url,
+          summary: link.summary,
+        });
+      }
+    }
+
+    const corpus = publicShelves.map((shelf) => {
+      const stats = shelfStats.get(String(shelf._id)) || {
+        totalLinks: 0,
+        totalReactions: 0,
+        freshness: 0,
+        latestActivityAt: shelf.updatedAt || shelf.createdAt || null,
+        previewLinks: [],
+      };
+
+      return {
+        _id: shelf._id,
+        name: shelf.name || 'Public Shelf',
+        ownerId: shelf.ownerId?._id || null,
+        ownerName: shelf.ownerId?.name || 'Unknown',
+        starCount: Array.isArray(shelf.starredBy) ? shelf.starredBy.length : 0,
+        starredByMe: Array.isArray(shelf.starredBy) ? shelf.starredBy.some((id) => String(id) === String(req.user.id)) : false,
+        commentsCount: commentCountByShelfId.get(String(shelf._id)) || 0,
+        totalLinks: stats.totalLinks,
+        totalReactions: stats.totalReactions,
+        latestActivityAt: stats.latestActivityAt,
+        popularity: shelfPopularityScore(stats),
+        previewLinks: stats.previewLinks,
+      };
+    });
+
+    const queryTokens = tokenize(queryText);
+    const expandedQueryTokens = expandQueryTokens(queryTokens);
+    if (expandedQueryTokens.length === 0) return res.json([]);
+
+    const rawVectors = corpus.map((item) => weightedShelfVector(item));
+    const df = new Map();
+    rawVectors.forEach((vec) => {
+      for (const term of vec.keys()) {
+        df.set(term, (df.get(term) || 0) + 1);
+      }
+    });
+
+    const docCount = rawVectors.length;
+    const idfMap = new Map();
+    for (const [term, freq] of df.entries()) {
+      idfMap.set(term, Math.log((docCount + 1) / (freq + 1)) + 1);
+    }
+
+    const queryVec = new Map();
+    expandedQueryTokens.forEach((token) => {
+      queryVec.set(token, (queryVec.get(token) || 0) + 1.5);
+    });
+    const weightedQueryVec = applyIdf(queryVec, idfMap);
+    const phrase = normalizeText(queryText);
+
+    const ranked = corpus
+      .map((item, index) => {
+        const vector = applyIdf(rawVectors[index], idfMap);
+        const cosine = cosineSimilarity(weightedQueryVec, vector);
+
+        const shelfName = normalizeText(item.name || '');
+        const ownerName = normalizeText(item.ownerName || '');
+        const previewText = normalizeText(
+          (item.previewLinks || [])
+            .map((preview) => `${preview.title || ''} ${preview.summary || ''} ${preview.url || ''}`)
+            .join(' ')
+        );
+
+        let bonus = 0;
+        if (phrase && shelfName.includes(phrase)) bonus += 0.32;
+        if (phrase && ownerName.includes(phrase)) bonus += 0.14;
+        if (phrase && previewText.includes(phrase)) bonus += 0.18;
+
+        expandedQueryTokens.forEach((token) => {
+          if (shelfName.includes(token)) bonus += 0.03;
+          if (previewText.includes(token)) bonus += 0.02;
+        });
+
+        const popularityBoost = Math.min(0.1, (item.starCount || 0) * 0.01 + (item.totalReactions || 0) * 0.0025);
+        const score = cosine + bonus + popularityBoost;
+        return { ...item, _score: score };
+      })
+      .filter((item) => item._score > 0.05)
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, ...item }) => item);
+
+    res.json(ranked);
+  } catch (err) {
+    console.error('searchPublicShelves error:', err.message);
+    res.status(500).json({ message: 'Server error searching public shelves' });
   }
 }
 
