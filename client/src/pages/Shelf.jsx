@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pencil, Trash2, Users } from 'lucide-react';
+import { Pencil, Trash2, Users, ArrowUpDown, Clock, Calendar, Star, MessageCircle, Type } from 'lucide-react';
 import Layout from '../components/Layout';
 import LinkInputBar from '../components/LinkInputBar';
 import LinkCard from '../components/LinkCard';
@@ -36,6 +36,8 @@ export default function Shelf() {
   const [newShelfName, setNewShelfName] = useState('');
   const [newShelfPublic, setNewShelfPublic] = useState(false);
   const [creatingShelf, setCreatingShelf] = useState(false);
+  const [sortBy, setSortBy] = useState('newest');
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -259,6 +261,28 @@ export default function Shelf() {
                   shelfData?.ownerId?._id === user?.id  ||
                   String(shelfData?.ownerId) === String(user?._id || user?.id);
 
+  // Sort links based on selected sort option
+  const sortedLinks = useMemo(() => {
+    const copy = [...links];
+    
+    switch (sortBy) {
+      case 'newest':
+        return copy.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      case 'oldest':
+        return copy.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      case 'starred':
+        return copy.sort((a, b) => (b.stars || 0) - (a.stars || 0));
+      case 'commented':
+        return copy.sort((a, b) => ((b.comments?.length || 0) - (a.comments?.length || 0)) || ((b.reactions?.length || 0) - (a.reactions?.length || 0)));
+      case 'a-z':
+        return copy.sort((a, b) => (a.title || a.url).localeCompare(b.title || b.url));
+      case 'z-a':
+        return copy.sort((a, b) => (b.title || b.url).localeCompare(a.title || a.url));
+      default:
+        return copy;
+    }
+  }, [links, sortBy]);
+
   return (
     <Layout>
       <div id="shelf-container" className="relative grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
@@ -331,6 +355,64 @@ export default function Shelf() {
           {/* URL Input */}
           <LinkInputBar shelfId={shelfId} onLinkCreated={handleNewLink} />
 
+          {/* Sort Controls */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setShowSortMenu(!showSortMenu)}
+                className="text-xs font-semibold text-[#6B7280] bg-white/70 border border-white/80 rounded-full px-3 py-1.5 hover:bg-white transition flex items-center gap-2"
+              >
+                <ArrowUpDown size={14} />
+                Sort
+              </button>
+
+              {showSortMenu && (
+                <div className="absolute top-full mt-2 left-0 bg-white border border-white/60 rounded-xl shadow-lg z-10 min-w-[180px]">
+                  {[
+                    { key: 'newest', label: 'Newest first', icon: Clock },
+                    { key: 'oldest', label: 'Oldest first', icon: Calendar },
+                    { key: 'starred', label: 'Most starred', icon: Star },
+                    { key: 'commented', label: 'Most commented', icon: MessageCircle },
+                    { key: 'a-z', label: 'A - Z', icon: Type },
+                    { key: 'z-a', label: 'Z - A', icon: Type },
+                  ].map((option) => {
+                    const IconComponent = option.icon;
+                    return (
+                      <button
+                        key={option.key}
+                        onClick={() => {
+                          setSortBy(option.key);
+                          setShowSortMenu(false);
+                        }}
+                        className={`w-full text-left text-sm px-4 py-2.5 transition border-b border-white/40 last:border-0 flex items-center gap-2 ${
+                          sortBy === option.key
+                            ? 'bg-[#F4845F]/10 text-[#F4845F] font-semibold'
+                            : 'text-[#6B7280] hover:bg-white/50'
+                        }`}
+                      >
+                        <IconComponent size={16} />
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {sortBy !== 'newest' && (
+              <p className="text-xs text-[#6B7280]">
+                Sorted by: <span className="font-semibold">
+                  {{
+                    oldest: 'Oldest first',
+                    starred: 'Most starred',
+                    commented: 'Most commented',
+                    'a-z': 'A - Z',
+                    'z-a': 'Z - A'
+                  }[sortBy] || sortBy}
+                </span>
+              </p>
+            )}
+          </div>
+
           {/* Link Grid */}
           {loading ? (
             <p className="text-[#6B7280] text-center mt-12">Loading your shelf…</p>
@@ -340,7 +422,7 @@ export default function Shelf() {
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {links.map((link) => {
+              {sortedLinks.map((link) => {
                 const linkOwnerId = link.addedBy?._id || link.addedBy;
                 const canDeleteLink = isOwner || String(linkOwnerId || '') === String(user?._id || user?.id || '');
                 return (
