@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Trash2, Link2 } from 'lucide-react';
+import { MessageSquare, Trash2, Link2, Flame, Skull, Zap, Orbit } from 'lucide-react';
 import VibePills from './VibePills';
 import LinkDetailModal from './LinkDetailModal';
 import { statusConfig } from '../utils/vibeConfig';
@@ -8,7 +8,12 @@ import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
 const SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
-const EMOJIS = ['🔥', '💀', '⚡', '🌀'];
+const REACTIONS = [
+  { emoji: '🔥', label: 'Hot', Icon: Flame },
+  { emoji: '💀', label: 'Dead', Icon: Skull },
+  { emoji: '⚡', label: 'Fast', Icon: Zap },
+  { emoji: '🌀', label: 'Chaotic', Icon: Orbit },
+];
 const URL_REGEX = /((?:https?:\/\/|www\.)[^\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?)/gi;
 const DECAY_FRESH_MINUTES = 10;
 const DECAY_DEAD_MINUTES = 30;
@@ -267,7 +272,7 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
   const commentSuggestions = suggestions.filter((item) => (item.type || 'comment') === 'comment');
   const linkSuggestions = suggestions.filter((item) => (item.type || 'comment') === 'link');
 
-  const countEmoji = (emoji) => reactions.filter((r) => r.emoji === emoji).length;
+  const countReaction = (emoji) => reactions.filter((r) => r.emoji === emoji).length;
 
   return (
     <>
@@ -309,10 +314,10 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
           <>
             {/* Screenshot thumbnail */}
             {screenshotSrc && (
-              <div className="h-32 w-full overflow-hidden bg-white/20">
+              <div className="h-32 w-full overflow-hidden rounded-t-[20px] bg-white/20">
                 <img
                   src={screenshotSrc} alt={link.title}
-                  className="w-full h-full object-cover object-top"
+                  className="w-full h-full object-cover object-top rounded-t-[20px]"
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
               </div>
@@ -337,20 +342,22 @@ export default function LinkCard({ link, canDelete = false, onDelete = null }) {
           {/* Vibe Pills */}
           <VibePills vibes={link.vibes} />
 
-          {/* Emoji Reactions */}
+          {/* Icon Reactions */}
           <div className="flex gap-1.5 flex-wrap">
-            {EMOJIS.map((emoji) => (
+            {REACTIONS.map(({ emoji, label, Icon }) => (
               <button
                 key={emoji}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleReact(emoji);
                 }}
+                title={label}
+                aria-label={label}
                 className="text-sm px-2 py-0.5 rounded-full bg-white/50 hover:bg-white/80 transition flex items-center gap-1"
               >
-                {emoji}
-                {countEmoji(emoji) > 0 && (
-                  <span className="text-xs font-semibold text-[#1A1A2E]">{countEmoji(emoji)}</span>
+                <Icon size={14} className="text-[#364d70]" />
+                {countReaction(emoji) > 0 && (
+                  <span className="text-xs font-semibold text-[#1A1A2E]">{countReaction(emoji)}</span>
                 )}
               </button>
             ))}

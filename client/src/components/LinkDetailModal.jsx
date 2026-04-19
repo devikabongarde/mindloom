@@ -1,12 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import VibePills from './VibePills';
 import api from '../utils/api';
+
+const SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+
+function getScreenshotUrl(path = '') {
+  const raw = String(path || '').trim();
+  if (!raw) return null;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  return `${SERVER_URL}${raw}`;
+}
 
 export default function LinkDetailModal({ link, onClose }) {
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
+  const screenshotSrc = getScreenshotUrl(link?.screenshot);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   const fetchContext = () => {
     if (fetched) return;
@@ -24,7 +43,7 @@ export default function LinkDetailModal({ link, onClose }) {
       onClick={onClose}
     >
       <div
-        className="theme-modal rounded-3xl shadow-2xl w-full max-w-2xl p-6 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)] overflow-hidden"
+        className="theme-modal rounded-3xl shadow-2xl w-full max-w-2xl h-[calc(100vh-2rem)] sm:h-[calc(100vh-3rem)] p-6 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="theme-modal-content flex flex-col h-full min-h-0">
@@ -42,7 +61,24 @@ export default function LinkDetailModal({ link, onClose }) {
             <button onClick={onClose} className="theme-muted hover:text-[#1A1A2E] text-xl leading-none flex-shrink-0">✕</button>
           </div>
 
-          <div className="mt-5 flex flex-col gap-5 overflow-y-auto min-h-0 pr-1">
+          <div className="mt-5 flex-1 min-h-0 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-5 pb-1">
+            {screenshotSrc && (
+              <div className="bg-white/45 rounded-2xl p-3 border border-white/60">
+                <p className="theme-subtle-label font-semibold mb-2">Snapshot</p>
+                <div className="overflow-hidden rounded-xl bg-white/30 border border-white/70">
+                  <img
+                    src={screenshotSrc}
+                    alt={link.title || 'Link snapshot'}
+                    className="w-full max-h-[300px] object-cover object-top"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Original Summary */}
             <div className="bg-white/45 rounded-2xl p-4 flex flex-col gap-3 border border-white/60">
               <p className="theme-subtle-label font-semibold">Original Summary</p>
@@ -114,6 +150,7 @@ export default function LinkDetailModal({ link, onClose }) {
                   </p>
                 </>
               )}
+            </div>
             </div>
           </div>
         </div>

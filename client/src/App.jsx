@@ -16,6 +16,7 @@ import AcceptInvite from './pages/AcceptInvite';
 import Discover from './pages/Discover';
 import Study from './pages/Study';
 import Chat from './pages/Chat';
+import StarredShelves from './pages/StarredShelves';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -96,6 +97,7 @@ function AppRoutes() {
       <Route path="/knowledge-graph" element={<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>} />
       <Route path="/discover"       element={<ProtectedRoute><Social /></ProtectedRoute>} />
       <Route path="/chat"           element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+      <Route path="/starred"        element={<ProtectedRoute><StarredShelves /></ProtectedRoute>} />
       <Route path="/study"          element={<ProtectedRoute><Study /></ProtectedRoute>} />
       <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/profile"        element={<ProtectedRoute><Profile /></ProtectedRoute>} />

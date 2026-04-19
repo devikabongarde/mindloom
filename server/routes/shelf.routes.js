@@ -9,6 +9,7 @@ import {
   forkShelf,
   getShelfLineage,
   updateShelfVisibility,
+  renameShelf,
   toggleShelfStar,
   deleteShelf,
   removeMemberFromShelf,
@@ -40,6 +41,7 @@ router.get('/:id/members',     authMiddleware, getShelfMembers);
 router.post('/:id/remove-member', authMiddleware, removeMemberFromShelf);
 router.patch('/:id/visibility', authMiddleware, updateShelfVisibility);
 router.patch('/:id/toggle-public', authMiddleware, updateShelfVisibility);
+router.patch('/:id/name', authMiddleware, renameShelf);
 router.delete('/:id',           authMiddleware, deleteShelf);
 
 // Parameterized routes

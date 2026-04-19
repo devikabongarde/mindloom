@@ -30,6 +30,7 @@ export default function Social() {
   const [discoverQuery, setDiscoverQuery] = useState('');
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverUsers, setDiscoverUsers] = useState([]);
+  const [shelfQuery, setShelfQuery] = useState('');
   const [openDiscussionByShelfId, setOpenDiscussionByShelfId] = useState({});
   const [commentsByShelfId, setCommentsByShelfId] = useState({});
   const [commentTextByShelfId, setCommentTextByShelfId] = useState({});
@@ -104,6 +105,22 @@ export default function Social() {
   const friendIdSet = useMemo(() => new Set(friends.map((f) => String(f._id))), [friends]);
   const incomingIdSet = useMemo(() => new Set(incoming.map((u) => String(u._id))), [incoming]);
   const sentIdSet = useMemo(() => new Set(sent.map((u) => String(u._id))), [sent]);
+  const filteredFeed = useMemo(() => {
+    const query = shelfQuery.trim().toLowerCase();
+    if (!query) return feed;
+
+    return feed.filter((item) => {
+      const shelfName = String(item?.name || '').toLowerCase();
+      const ownerName = String(item?.ownerName || '').toLowerCase();
+      const previewText = Array.isArray(item?.previewLinks)
+        ? item.previewLinks
+            .map((preview) => `${preview?.title || ''} ${preview?.url || ''}`.toLowerCase())
+            .join(' ')
+        : '';
+
+      return shelfName.includes(query) || ownerName.includes(query) || previewText.includes(query);
+    });
+  }, [feed, shelfQuery]);
 
   const handleRequest = async (userId) => {
     await api.post('/api/social/friends/request', { userId });
@@ -308,13 +325,24 @@ export default function Social() {
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5f7498]">Trending now</span>
               </div>
 
+              <div className="theme-panel rounded-2xl px-4 py-3 mb-4">
+                <input
+                  value={shelfQuery}
+                  onChange={(e) => setShelfQuery(e.target.value)}
+                  placeholder="Search shelves by title, owner, or link..."
+                  className="w-full bg-transparent outline-none text-sm text-[#20314d] placeholder:text-[#8aa0c1]"
+                />
+              </div>
+
               {feedLoading ? (
                 <p className="theme-muted text-sm">Loading public feed…</p>
               ) : feed.length === 0 ? (
                 <p className="theme-muted text-sm">No public shelves yet. Make a shelf public to appear in the social feed.</p>
+              ) : filteredFeed.length === 0 ? (
+                <p className="theme-muted text-sm">No shelves match your search.</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {feed.map((item, index) => (
+                  {filteredFeed.map((item, index) => (
                     <div
                       key={item._id}
                       className="bg-white/55 border border-white/70 rounded-2xl p-4 hover:bg-white/85 transition"

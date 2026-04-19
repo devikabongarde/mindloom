@@ -222,6 +222,34 @@ export const updateShelfVisibility = async (req, res) => {
   }
 };
 
+// PATCH /api/shelves/:id/name
+export const renameShelf = async (req, res) => {
+  try {
+    const nextName = String(req.body?.name || '').trim();
+    if (!nextName) {
+      return res.status(400).json({ message: 'name is required' });
+    }
+    if (nextName.length > 80) {
+      return res.status(400).json({ message: 'name must be 80 characters or fewer' });
+    }
+
+    const shelf = await Shelf.findById(req.params.id);
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isOwner = String(shelf.ownerId) === String(req.user.id);
+    if (!isOwner) {
+      return res.status(403).json({ message: 'Only the shelf owner can rename this shelf' });
+    }
+
+    shelf.name = nextName;
+    await shelf.save();
+
+    res.json({ _id: shelf._id, name: shelf.name });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error renaming shelf' });
+  }
+};
+
 // DELETE /api/shelves/:id
 export const deleteShelf = async (req, res) => {
   try {

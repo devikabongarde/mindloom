@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Trash2, Users } from 'lucide-react';
+import { Pencil, Trash2, Users } from 'lucide-react';
 import Layout from '../components/Layout';
 import LinkInputBar from '../components/LinkInputBar';
 import LinkCard from '../components/LinkCard';
@@ -160,6 +160,34 @@ export default function Shelf() {
       }
     } catch {
       alert('Could not delete shelf.');
+    }
+  };
+
+  const handleRenameShelf = async (targetShelfId, currentName = 'Untitled shelf') => {
+    const nextName = window.prompt('Rename shelf:', currentName);
+    if (nextName === null) return;
+
+    const trimmed = nextName.trim();
+    if (!trimmed) {
+      alert('Shelf name cannot be empty.');
+      return;
+    }
+    if (trimmed.length > 80) {
+      alert('Shelf name must be 80 characters or fewer.');
+      return;
+    }
+    if (trimmed === currentName) return;
+
+    try {
+      const { data } = await api.patch(`/api/shelves/${targetShelfId}/name`, { name: trimmed });
+      setShelves((prev) => prev.map((s) => (
+        String(s._id) === String(targetShelfId) ? { ...s, name: data.name } : s
+      )));
+      setShelfData((prev) => (
+        prev && String(prev._id) === String(targetShelfId) ? { ...prev, name: data.name } : prev
+      ));
+    } catch {
+      alert('Could not rename shelf.');
     }
   };
 
@@ -408,17 +436,30 @@ export default function Shelf() {
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <p className="text-xs theme-muted">{isCurrent ? 'Currently open' : 'Open this shelf'}</p>
                       {isShelfOwner && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteShelf(shelf._id, shelf.name);
-                          }}
-                          title="Delete shelf"
-                          aria-label="Delete shelf"
-                          className="text-[#cc3d3d] hover:text-[#a92828] transition"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRenameShelf(shelf._id, shelf.name);
+                            }}
+                            title="Rename shelf"
+                            aria-label="Rename shelf"
+                            className="text-[#3f5a86] hover:text-[#20314d] transition"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteShelf(shelf._id, shelf.name);
+                            }}
+                            title="Delete shelf"
+                            aria-label="Delete shelf"
+                            className="text-[#cc3d3d] hover:text-[#a92828] transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
