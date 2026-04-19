@@ -521,10 +521,10 @@ export default function KnowledgeGraphView({ links = [], includeShelfNodes = fal
                   const treatedAsDrag = dragRef.current.moved || movedDistance > 5 || panDragRef.current.moved;
 
                   if (treatedAsDrag) return;
-                  if (node.url) window.open(node.url, '_blank', 'noopener,noreferrer');
                 }}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
+                  if (node.url) window.open(node.url, '_blank', 'noopener,noreferrer');
                 }}
                 onClick={(e) => e.stopPropagation()}
                 style={{ cursor: 'grab' }}

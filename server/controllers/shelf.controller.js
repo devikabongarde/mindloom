@@ -1,10 +1,41 @@
 import crypto from 'crypto';
+import axios from 'axios';
 import Notification from '../models/Notification.js';
 import Shelf from '../models/Shelf.js';
 import ShelfComment from '../models/ShelfComment.js';
 import Link from '../models/Link.js';
 import ShelfInvite from '../models/ShelfInvite.js';
 import User from '../models/User.js';
+
+async function sendInviteToTelegramIfAvailable(email, inviteUrl, shelfName = 'a shelf') {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return false;
+
+  const user = await User.findOne({ email: normalizedEmail }).select('telegramId name').lean();
+  const telegramId = String(user?.telegramId || '').trim();
+  if (!telegramId) return false;
+
+  const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!botToken) return false;
+
+  const text = [
+    'You received a SHELFLIFE shelf invite.',
+    '',
+    `Shelf: ${shelfName}`,
+    `Invite link: ${inviteUrl}`,
+  ].join('\n');
+
+  try {
+    await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      chat_id: telegramId,
+      text,
+    });
+    return true;
+  } catch (err) {
+    console.error('sendInviteToTelegramIfAvailable error:', err.response?.data || err.message);
+    return false;
+  }
+}
 
 // POST /api/shelves/team
 export const createTeamShelf = async (req, res) => {
@@ -40,9 +71,17 @@ export const inviteMemberToShelf = async (req, res) => {
     if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
     if (shelf.ownerId.toString() !== req.user.id) return res.status(403).json({ message: 'Only the owner can invite' });
     const token = crypto.randomBytes(16).toString('hex');
-    await ShelfInvite.create({ shelfId, email: email.toLowerCase(), token });
+    const normalizedEmail = email.toLowerCase();
+    await ShelfInvite.create({ shelfId, email: normalizedEmail, token });
     const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/invite/${token}`;
-    res.json({ inviteUrl });
+
+    const telegramSent = await sendInviteToTelegramIfAvailable(
+      normalizedEmail,
+      inviteUrl,
+      shelf.name || 'a shelf'
+    );
+
+    res.json({ inviteUrl, telegramSent });
   } catch (err) {
     res.status(500).json({ message: 'Server error creating invite' });
   }

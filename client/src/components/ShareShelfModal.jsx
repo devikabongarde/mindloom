@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../utils/api';
 
 export default function ShareShelfModal({ shelfId, onClose }) {
@@ -7,6 +7,35 @@ export default function ShareShelfModal({ shelfId, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [friends, setFriends] = useState([]);
+  const [friendsLoading, setFriendsLoading] = useState(true);
+  const [sendStatus, setSendStatus] = useState('');
+  const [sendingToFriendId, setSendingToFriendId] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api.get('/api/social/friends')
+      .then(({ data }) => {
+        if (cancelled) return;
+        setFriends(Array.isArray(data?.friends) ? data.friends : []);
+      })
+      .catch(() => {
+        if (!cancelled) setFriends([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFriendsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const createInviteForEmail = async (targetEmail) => {
+    const { data } = await api.post('/api/shelves/invite', { shelfId, email: targetEmail });
+    return data?.inviteUrl || '';
+  };
 
   const handleInvite = async (e) => {
     e.preventDefault();
@@ -14,12 +43,38 @@ export default function ShareShelfModal({ shelfId, onClose }) {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/api/shelves/invite', { shelfId, email });
-      setInviteUrl(data.inviteUrl);
+      const url = await createInviteForEmail(email);
+      setInviteUrl(url);
+      setSendStatus('');
     } catch {
       setError('Failed to create invite. Only the shelf owner can invite.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendToFriendChat = async (friend) => {
+    const friendId = String(friend?._id || '');
+    const friendEmail = String(friend?.email || '').trim();
+    if (!friendId || !friendEmail) return;
+
+    setSendingToFriendId(friendId);
+    setError('');
+    setSendStatus('');
+
+    try {
+      const url = await createInviteForEmail(friendEmail);
+      if (!url) throw new Error('No invite link returned');
+
+      setInviteUrl(url);
+
+      const text = `Join my shelf using this invite link: ${url}`;
+      await api.post(`/api/chat/${friendId}/messages`, { text });
+      setSendStatus(`Invite sent to ${friend.name} in chat.`);
+    } catch {
+      setError('Could not send invite to chat. Please make sure this person is your friend and try again.');
+    } finally {
+      setSendingToFriendId('');
     }
   };
 
@@ -78,6 +133,37 @@ export default function ShareShelfModal({ shelfId, onClose }) {
             </div>
           </div>
         )}
+
+        <div className="mt-4 rounded-2xl bg-white/45 border border-white/60 p-3">
+          <p className="text-xs theme-muted mb-2 font-medium">Send directly to a friend chat</p>
+          {friendsLoading ? (
+            <p className="text-xs theme-muted">Loading friends...</p>
+          ) : friends.length === 0 ? (
+            <p className="text-xs theme-muted">No friends found. Add friends first to send invite links directly.</p>
+          ) : (
+            <div className="max-h-44 overflow-y-auto flex flex-col gap-2 pr-1">
+              {friends.map((friend) => {
+                const isSending = String(sendingToFriendId) === String(friend._id);
+                return (
+                  <div key={friend._id} className="flex items-center justify-between gap-2 rounded-xl bg-white/70 border border-white/70 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[#20314d] truncate">{friend.name}</p>
+                      <p className="text-[11px] theme-muted truncate">{friend.email}</p>
+                    </div>
+                    <button
+                      onClick={() => handleSendToFriendChat(friend)}
+                      disabled={isSending}
+                      className="theme-button-secondary rounded-full px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap disabled:opacity-70"
+                    >
+                      {isSending ? 'Sending...' : 'Send in chat'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {sendStatus && <p className="text-xs text-green-600 mt-2">{sendStatus}</p>}
+        </div>
 
         <button
           onClick={onClose}

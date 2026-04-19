@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
@@ -9,6 +10,7 @@ import authRoutes      from './routes/auth.routes.js';
 import shelfRoutes     from './routes/shelf.routes.js';
 import linkRoutes      from './routes/link.routes.js';
 import socialRoutes    from './routes/social.routes.js';
+import chatRoutes      from './routes/chat.routes.js';
 // import whatsappRoutes  from './routes/whatsapp.routes.js';
 import telegramRoutes  from './routes/telegram.routes.js';
 import { startDecayReminderScheduler } from './services/decayReminder.service.js';
@@ -54,6 +56,7 @@ app.use('/api/auth',      authRoutes);
 app.use('/api/shelves',   shelfRoutes);
 app.use('/api/links',     linkRoutes);
 app.use('/api/social',    socialRoutes);
+app.use('/api/chat',      chatRoutes);
 // app.use('/api/whatsapp',  whatsappRoutes);
 app.use('/api/telegram',  telegramRoutes);
 app.get('/', (req, res) => res.json({ message: 'SHELFLIFE API running' }));
@@ -68,8 +71,30 @@ app.use((err, req, res, next) => {
 
 // Socket.IO event handlers
 if (REALTIME_ENABLED && io) {
+  io.use((socket, next) => {
+    const authToken = socket.handshake?.auth?.token;
+    const authHeader = socket.handshake?.headers?.authorization;
+    const tokenFromHeader = authHeader && String(authHeader).startsWith('Bearer ')
+      ? String(authHeader).slice(7)
+      : null;
+    const token = authToken || tokenFromHeader;
+
+    if (!token) return next(new Error('Unauthorized'));
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.data.userId = String(decoded.id || '');
+      return next();
+    } catch {
+      return next(new Error('Unauthorized'));
+    }
+  });
+
   io.on('connection', (socket) => {
     console.log('Socket connected:', socket.id);
+    if (socket.data?.userId) {
+      socket.join(`user:${socket.data.userId}`);
+    }
 
     socket.on('join-shelf', ({ shelfId, userName }) => {
       socket.join(shelfId);

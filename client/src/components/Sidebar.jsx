@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, BookOpen, Trash2, User, Bell, LogOut, Network, GraduationCap, Compass, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Home, BookOpen, Trash2, User, Bell, LogOut, Network, Compass, MessageCircle, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import { getSocket } from '../utils/socket';
 
 const navItems = [
   { to: '/dashboard',       icon: Home,           label: 'Dashboard'      },
@@ -10,6 +11,7 @@ const navItems = [
   // { to: '/discover',        icon: Compass,        label: 'Discover'       },
   // { to: '/study',           icon: GraduationCap,  label: 'Study Mode'     },
   { to: '/discover',        icon: Compass,        label: 'Discover'       },
+  { to: '/chat',            icon: MessageCircle,  label: 'Chat'           },
   { to: '/knowledge-graph', icon: Network,        label: 'Knowledge Graph'},
   { to: '/compost',         icon: Trash2,         label: 'Compost Heap'   },
 ];
@@ -20,30 +22,61 @@ const utilityItems = [
 ];
 
 export default function Sidebar({ isCollapsed = false, onToggleCollapse = () => {} }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadUnreadCount = async () => {
+    const loadBadgeCounts = async () => {
       try {
-        const { data } = await api.get('/api/social/notifications', { params: { limit: 20 } });
-        if (!cancelled) setUnreadCount(Number(data?.unreadCount || 0));
+        const [notificationsRes, chatRes] = await Promise.all([
+          api.get('/api/social/notifications', { params: { limit: 20 } }),
+          api.get('/api/chat/unread-summary'),
+        ]);
+        if (!cancelled) {
+          setUnreadCount(Number(notificationsRes?.data?.unreadCount || 0));
+          setChatUnreadCount(Number(chatRes?.data?.total || 0));
+        }
       } catch {
-        if (!cancelled) setUnreadCount(0);
+        if (!cancelled) {
+          setUnreadCount(0);
+          setChatUnreadCount(0);
+        }
       }
     };
 
-    loadUnreadCount();
-    const intervalId = window.setInterval(loadUnreadCount, 30_000);
+    loadBadgeCounts();
+    const intervalId = window.setInterval(loadBadgeCounts, 30_000);
+
+    const s = getSocket();
+    const myUserId = String(user?._id || user?.id || '');
+    const handleChatMessage = (message) => {
+      const recipient = String(message?.recipientId || '');
+      if (!myUserId || recipient !== myUserId) return;
+      loadBadgeCounts();
+    };
+    const handleUnreadUpdate = (summary) => {
+      if (cancelled) return;
+      setChatUnreadCount(Number(summary?.total || 0));
+    };
+    if (s) {
+      if (!s.connected) s.connect();
+      s.on('chat:message:new', handleChatMessage);
+      s.on('chat:unread:update', handleUnreadUpdate);
+    }
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
+      if (s) {
+        s.off('chat:message:new', handleChatMessage);
+        s.off('chat:unread:update', handleUnreadUpdate);
+      }
     };
-  }, []);
+  }, [user?._id, user?.id]);
 
   const handleLogout = () => {
     logout();
@@ -103,6 +136,9 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse = () => 
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )
+              )}
+              {to === '/chat' && chatUnreadCount > 0 && (
+                <span className={`absolute rounded-full bg-[#F4845F] border border-white/80 ${isCollapsed ? 'right-1.5 top-1.5 w-2.5 h-2.5' : 'right-3 top-3 w-2 h-2'}`} aria-hidden="true" />
               )}
             </NavLink>
           ))}

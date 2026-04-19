@@ -10,6 +10,10 @@ export function getSocket() {
   if (!socket) {
     socket = io(URL, {
       autoConnect: false,
+      auth: (cb) => {
+        const token = localStorage.getItem('shelflife_token');
+        cb({ token });
+      },
     });
   }
   return socket;

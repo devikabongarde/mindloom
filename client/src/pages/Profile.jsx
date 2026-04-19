@@ -503,7 +503,7 @@ export default function Profile() {
                   className="mt-4 theme-button rounded-full px-4 py-2 text-sm font-semibold inline-flex items-center gap-2"
                 >
                   <MessageCircle size={15} />
-                  Go to Discover & Chat
+                  Go to Discover
                 </button>
               </div>
 
