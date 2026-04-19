@@ -14,6 +14,9 @@ const shelfSchema = new mongoose.Schema(
       enum: ['Stormy', 'Breezy', 'Foggy'],
       default: 'Foggy',
     },
+    studyModeEnabled: { type: Boolean, default: false },
+    defaultSubject:   { type: String, default: null },
+
   },
   { timestamps: true }
 );

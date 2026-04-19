@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Users } from 'lucide-react';
 import Layout from '../components/Layout';
 import LinkInputBar from '../components/LinkInputBar';
 import LinkCard from '../components/LinkCard';
 import ShareShelfModal from '../components/ShareShelfModal';
+import ManageMembersModal from '../components/ManageMembersModal';
 import LiveCursors from '../components/LiveCursors';
 import LineagePanel from '../components/LineagePanel';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +31,7 @@ export default function Shelf() {
   const [shelvesLoading, setShelvesLoading] = useState(true);
   const [presence, setPresence] = useState({});
   const [showShare, setShowShare] = useState(false);
+  const [showManageMembers, setShowManageMembers] = useState(false);
   const [visibilityUpdating, setVisibilityUpdating] = useState(false);
   const [newShelfName, setNewShelfName] = useState('');
   const [newShelfPublic, setNewShelfPublic] = useState(false);
@@ -53,10 +55,16 @@ export default function Shelf() {
       });
   }, [shelfId]);
 
-  // Socket.IO: join room, listen for live events
+  // Socket.IO: join room, listen for live events (only for shared shelves, not forks)
   useEffect(() => {
     const s = getSocket();
-    if (!s || !user || !shelfId) return;
+    if (!s || !user || !shelfId || !shelfData) return;
+    
+    // Only enable realtime for shared shelves (members > 1), not forked shelves
+    const isSharedShelf = shelfData.members?.length > 1;
+    const isForkedShelf = !!shelfData.parentShelfId;
+    
+    if (!isSharedShelf || isForkedShelf) return;
     
     if (!s.connected) s.connect();
     s.emit('join-shelf', { shelfId, userName: user.name });
@@ -78,7 +86,7 @@ export default function Shelf() {
       s.off('link-enriched');
       s.off('presence-update');
     };
-  }, [user, shelfId]);
+  }, [user, shelfId, shelfData]);
 
   // Fallback: when realtime is disabled, poll while links are still enriching.
   useEffect(() => {
@@ -204,9 +212,8 @@ export default function Shelf() {
     if (!shelfData?._id || !isOwner || visibilityUpdating) return;
     setVisibilityUpdating(true);
     try {
-      const nextIsPublic = !shelfData.isPublic;
-      const { data } = await api.patch(`/api/shelves/${shelfData._id}/visibility`, {
-        isPublic: nextIsPublic,
+      const { data } = await api.patch(`/api/shelves/${shelfData._id}/toggle-public`, {
+        isPublic: !shelfData.isPublic
       });
       setShelfData((prev) => (prev ? { ...prev, isPublic: data.isPublic } : prev));
     } catch {
@@ -215,6 +222,7 @@ export default function Shelf() {
       setVisibilityUpdating(false);
     }
   };
+
 
   const recentCount = links.filter((l) => (Date.now() - new Date(l.createdAt)) / 60000 < 5).length;
   const weather = recentCount >= 3 ? '⛈ Stormy' : recentCount >= 1 ? '🌤 Breezy' : '🌫 Foggy';
@@ -227,7 +235,9 @@ export default function Shelf() {
     <Layout>
       <div id="shelf-container" className="relative grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         <div className="flex min-w-0 flex-col gap-8">
-          <LiveCursors shelfId={shelfId} currentUser={user} />
+          {shelfData?.members?.length > 1 && !shelfData?.parentShelfId && (
+            <LiveCursors shelfId={shelfId} currentUser={user} />
+          )}
 
           {/* Header */}
           <div className="flex items-center justify-between gap-4">
@@ -249,13 +259,15 @@ export default function Shelf() {
 
             {/* Controls */}
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+              {!isOwner && (
               <button
                 onClick={handleFork}
                 className="text-xs font-semibold text-[#6B7280] bg-white/70 border border-white/80 rounded-full px-3 py-1.5 hover:bg-white transition"
               >
                 🌿 Fork
               </button>
-              {isOwner && (
+              )}
+              {isOwner && !shelfData?.parentShelfId && (
                 <button
                   onClick={toggleVisibility}
                   disabled={visibilityUpdating}
@@ -264,7 +276,17 @@ export default function Shelf() {
                   {visibilityUpdating ? 'Updating...' : shelfData?.isPublic ? '🌍 Public' : '🔒 Private'}
                 </button>
               )}
-              {isOwner && (
+              {isOwner && !shelfData?.parentShelfId && (
+                <button
+                  onClick={() => setShowManageMembers(true)}
+                  className="text-xs font-semibold text-[#6B7280] bg-white/70 border border-white/80 rounded-full px-3 py-1.5 hover:bg-white transition flex items-center gap-1"
+                  title="Manage members"
+                >
+                  <Users size={14} />
+                  Members
+                </button>
+              )}
+              {isOwner && !shelfData?.parentShelfId && (
                 <button
                   onClick={() => setShowShare(true)}
                   className="text-xs font-semibold text-[#F4845F] bg-white/70 border border-white/80 rounded-full px-3 py-1.5 hover:bg-white transition"
@@ -408,6 +430,7 @@ export default function Shelf() {
       </div>
 
       {showShare && <ShareShelfModal shelfId={shelfId} onClose={() => setShowShare(false)} />}
+      {showManageMembers && <ManageMembersModal shelfId={shelfId} onClose={() => setShowManageMembers(false)} />}
     </Layout>
   );
 }

@@ -13,6 +13,8 @@ import CompostHeap from './pages/CompostHeap';
 import KnowledgeGraph from './pages/KnowledgeGraph';
 import Profile from './pages/Profile';
 import AcceptInvite from './pages/AcceptInvite';
+import Discover from './pages/Discover';
+import Study from './pages/Study';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -91,6 +93,8 @@ function AppRoutes() {
       <Route path="/notifications"  element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/compost"        element={<ProtectedRoute><CompostHeap /></ProtectedRoute>} />
       <Route path="/knowledge-graph" element={<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>} />
+      <Route path="/discover"       element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+      <Route path="/study"          element={<ProtectedRoute><Study /></ProtectedRoute>} />
       <Route path="/profile"        element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/invite/:token"  element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
       <Route path="*"               element={<Navigate to={user ? '/dashboard' : '/'} replace />} />

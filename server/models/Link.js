@@ -29,7 +29,10 @@ const linkSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    subject:       { type: String, default: null },
+    topic:         { type: String, default: null },
     lastClickedAt: { type: Date, default: Date.now },
+
   },
   { timestamps: true }
 );

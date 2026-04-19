@@ -104,6 +104,7 @@ router.post('/register', async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        telegramId: user.telegramId,
         avatarUrl: user.avatarUrl,
         defaultShelfId: user.defaultShelfId,
         vibeStats: user.vibeStats,
@@ -133,6 +134,7 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        telegramId: user.telegramId,
         avatarUrl: user.avatarUrl,
         defaultShelfId: user.defaultShelfId,
         vibeStats: user.vibeStats,
@@ -153,6 +155,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      telegramId: user.telegramId,
       avatarUrl: user.avatarUrl,
       defaultShelfId: user.defaultShelfId,
       vibeStats: user.vibeStats,
@@ -171,6 +174,7 @@ router.patch('/me', authMiddleware, async (req, res) => {
       name,
       email,
       phone,
+      telegramId,
       avatarUrl,
       avatarDataUrl,
       curatorArchetypeName,
@@ -201,6 +205,11 @@ router.patch('/me', authMiddleware, async (req, res) => {
     if (typeof phone === 'string') {
       const nextPhone = phone.trim();
       user.phone = nextPhone || null;
+    }
+
+    if (typeof telegramId === 'string') {
+      const nextTelegramId = telegramId.trim();
+      user.telegramId = nextTelegramId || null;
     }
 
     if (typeof avatarDataUrl === 'string' && avatarDataUrl.trim()) {
@@ -257,6 +266,7 @@ router.patch('/me', authMiddleware, async (req, res) => {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      telegramId: user.telegramId,
       avatarUrl: user.avatarUrl,
       defaultShelfId: user.defaultShelfId,
       vibeStats: user.vibeStats,

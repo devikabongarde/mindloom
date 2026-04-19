@@ -12,6 +12,7 @@ const notificationSchema = new mongoose.Schema(
         'shelf_starred',
         'shelf_forked',
         'shelf_comment',
+        'shelf_access_revoked',
         'link_reacted',
         'link_comment',
         'link_reference',

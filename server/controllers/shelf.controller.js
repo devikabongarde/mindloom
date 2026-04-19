@@ -80,13 +80,13 @@ export const forkShelf = async (req, res) => {
     if (!source.isPublic && !source.members.map(String).includes(req.user.id))
       return res.status(403).json({ message: 'Cannot fork a private shelf you are not a member of' });
 
-    // Create forked shelf with lineage pointer
+    // Create forked shelf with lineage pointer (always public like GitHub)
     const forked = await Shelf.create({
       name: newName,
       ownerId: req.user.id,
       members: [req.user.id],
       type: 'team',
-      isPublic: false,
+      isPublic: true,
       parentShelfId: sourceShelfId,
     });
 
@@ -169,6 +169,11 @@ export const updateShelfVisibility = async (req, res) => {
     const isOwner = String(shelf.ownerId) === String(req.user.id);
     if (!isOwner) return res.status(403).json({ message: 'Only the shelf owner can change visibility' });
 
+    // Forked shelves must remain public (like GitHub)
+    if (shelf.parentShelfId && !isPublic) {
+      return res.status(400).json({ message: 'Forked shelves must remain public' });
+    }
+
     shelf.isPublic = isPublic;
     await shelf.save();
 
@@ -202,7 +207,81 @@ export const deleteShelf = async (req, res) => {
   }
 };
 
-// POST /api/shelves/:id/star
+// POST /api/shelves/:id/remove-member
+export const removeMemberFromShelf = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ message: 'userId is required' });
+
+    const shelf = await Shelf.findById(req.params.id);
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isOwner = String(shelf.ownerId) === String(req.user.id);
+    if (!isOwner) {
+      return res.status(403).json({ message: 'Only the shelf owner can remove members' });
+    }
+
+    if (String(userId) === String(shelf.ownerId)) {
+      return res.status(400).json({ message: 'Cannot remove the owner from the shelf' });
+    }
+
+    shelf.members = shelf.members.filter((id) => String(id) !== String(userId));
+    await shelf.save();
+
+    // Notify the removed user
+    const owner = await User.findById(req.user.id).select('name').lean();
+    await Notification.create({
+      userId: userId,
+      actorId: req.user.id,
+      type: 'shelf_access_revoked',
+      title: 'Shelf access removed',
+      message: `${owner?.name || 'Someone'} removed your access to "${shelf.name}"`,
+      meta: { shelfId: shelf._id },
+      isRead: false,
+    });
+
+    res.json({ message: 'Member removed successfully', shelfId: shelf._id });
+  } catch (err) {
+    console.error('removeMemberFromShelf error:', err.message);
+    res.status(500).json({ message: 'Server error removing member' });
+  }
+};
+
+// GET /api/shelves/:id/members
+export const getShelfMembers = async (req, res) => {
+  try {
+    const shelf = await Shelf.findById(req.params.id)
+      .populate('members', 'name email')
+      .populate('ownerId', 'name email');
+    
+    if (!shelf) return res.status(404).json({ message: 'Shelf not found' });
+
+    const isMember = shelf.members.some((m) => String(m._id) === String(req.user.id));
+    const isOwner = String(shelf.ownerId._id) === String(req.user.id);
+
+    if (!isMember && !isOwner) {
+      return res.status(403).json({ message: 'You do not have access to this shelf' });
+    }
+
+    res.json({
+      owner: {
+        _id: shelf.ownerId._id,
+        name: shelf.ownerId.name,
+        email: shelf.ownerId.email,
+      },
+      members: shelf.members
+        .filter((m) => String(m._id) !== String(shelf.ownerId._id))
+        .map((m) => ({
+          _id: m._id,
+          name: m.name,
+          email: m.email,
+        })),
+    });
+  } catch (err) {
+    console.error('getShelfMembers error:', err.message);
+    res.status(500).json({ message: 'Server error fetching members' });
+  }
+};
 export const toggleShelfStar = async (req, res) => {
   try {
     const shelf = await Shelf.findById(req.params.id);

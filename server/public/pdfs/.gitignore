@@ -1,0 +1,5 @@
+# Ignore generated PDF files
+*.pdf
+
+# Keep the directory structure
+!.gitkeep

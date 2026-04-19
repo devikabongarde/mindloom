@@ -11,6 +11,16 @@ const VIBE_COLORS = {
   Chaotic:       'bg-orange-100 text-orange-700',
   Cursed:        'bg-purple-100 text-purple-700',
   Inspirational: 'bg-pink-100 text-pink-700',
+  Entertainment: 'bg-red-100 text-red-700',
+  Shopping:      'bg-yellow-100 text-yellow-700',
+  News:          'bg-indigo-100 text-indigo-700',
+  Technology:    'bg-cyan-100 text-cyan-700',
+  Design:        'bg-fuchsia-100 text-fuchsia-700',
+  Business:      'bg-emerald-100 text-emerald-700',
+  Lifestyle:     'bg-rose-100 text-rose-700',
+  Creative:      'bg-violet-100 text-violet-700',
+  Research:      'bg-teal-100 text-teal-700',
+  Tools:         'bg-slate-100 text-slate-700',
 };
 
 export default function Profile() {
@@ -33,7 +43,7 @@ export default function Profile() {
   const [form, setForm] = useState({
     name: '',
     email: '',
-    phone: '',
+    telegramId: '',
     defaultShelfId: '',
     curatorArchetypeName: '',
     curatorArchetypeDescription: '',
@@ -55,7 +65,7 @@ export default function Profile() {
     setForm({
       name: user.name || '',
       email: user.email || '',
-      phone: user.phone || '',
+      telegramId: user.telegramId || '',
       defaultShelfId: user.defaultShelfId || '',
       curatorArchetypeName: user.curatorArchetype?.name || '',
       curatorArchetypeDescription: user.curatorArchetype?.description || '',
@@ -104,7 +114,7 @@ export default function Profile() {
       const payload = {
         name: form.name,
         email: form.email,
-        phone: form.phone,
+        telegramId: form.telegramId,
         defaultShelfId: form.defaultShelfId || null,
         curatorArchetypeName: form.curatorArchetypeName,
         curatorArchetypeDescription: form.curatorArchetypeDescription,
@@ -331,8 +341,8 @@ export default function Profile() {
                 <p className="text-sm font-semibold text-[#20314d] mt-0.5 break-all">{user.email || 'Not set'}</p>
               </div>
               <div className="rounded-xl bg-white/55 border border-white/70 px-3 py-2">
-                <p className="text-[11px] theme-muted uppercase tracking-wide">Phone</p>
-                <p className="text-sm font-semibold text-[#20314d] mt-0.5">{user.phone || 'Not set'}</p>
+                <p className="text-[11px] theme-muted uppercase tracking-wide">Telegram ID</p>
+                <p className="text-sm font-semibold text-[#20314d] mt-0.5">{user.telegramId || 'Not linked'}</p>
               </div>
               <div className="rounded-xl bg-white/55 border border-white/70 px-3 py-2">
                 <p className="text-[11px] theme-muted uppercase tracking-wide">Default Shelf</p>
@@ -423,13 +433,14 @@ export default function Profile() {
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs theme-muted">Phone</span>
+                <span className="text-xs theme-muted">Telegram ID</span>
                 <input
-                  value={form.phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Optional"
+                  value={form.telegramId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, telegramId: e.target.value }))}
+                  placeholder="Get from bot: /start"
                   className="rounded-xl bg-white/70 border border-white/70 px-3 py-2 text-sm text-[#20314d] outline-none"
                 />
+                <span className="text-[10px] theme-muted mt-0.5">Message your bot to get your Telegram ID</span>
               </label>
 
               <label className="flex flex-col gap-1">

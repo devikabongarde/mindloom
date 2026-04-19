@@ -209,12 +209,21 @@ export const createLink = async (req, res) => {
         await tempLink.save();
 
         const statsUpdate = {};
-        ai.vibes.forEach((v) => { statsUpdate[`vibeStats.${v.replace('-', '')}`] = 1; });
-        await User.findByIdAndUpdate(req.user.id, { $inc: statsUpdate });
+        ai.vibes.forEach((v) => { 
+          const vibeKey = v.replace(/[^a-zA-Z]/g, ''); // Remove all non-letters
+          if (vibeKey) {
+            statsUpdate[`vibeStats.${vibeKey}`] = 1;
+          }
+        });
+        
+        if (Object.keys(statsUpdate).length > 0) {
+          await User.findByIdAndUpdate(req.user.id, { $inc: statsUpdate });
+        }
 
         if (io) io.to(shelfId).emit('link-enriched', tempLink.toObject());
       } catch (enrichErr) {
         console.error('Async enrichment error:', enrichErr.message);
+        console.error('Stack:', enrichErr.stack);
       }
       return;
     }
@@ -228,7 +237,8 @@ export const createLink = async (req, res) => {
     res.status(201).json(link);
   } catch (err) {
     console.error('createLink error:', err.message);
-    res.status(500).json({ message: 'Server error creating link' });
+    console.error('Stack:', err.stack);
+    res.status(500).json({ message: 'Server error creating link', error: err.message });
   }
 };
 
