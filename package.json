@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "build": "npm run build --prefix client",
+    "dev": "npm run dev --prefix client"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.6",

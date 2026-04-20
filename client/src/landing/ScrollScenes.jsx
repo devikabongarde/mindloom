@@ -87,8 +87,8 @@ const BLOB_MOTION = [
   { parallaxX: 0.42, parallaxY: -0.29, driftX: 27, driftY: 23, tilt: 0.012, speed: 0.0012, phase: 4.1 },
 ]
 
-const AUTO_ADVANCE_MS = 6000
-const AUTO_ADVANCE_COOLDOWN_MS = 2500
+const AUTO_ADVANCE_MS = 3800
+const AUTO_ADVANCE_COOLDOWN_MS = 1500
 
 export default function ScrollScenes() {
   const navigate = useNavigate()

@@ -1,7 +1,6 @@
 {
-  "buildCommand": "cd server && npm install",
-  "outputDirectory": "server",
-  "env": {
-    "NODE_ENV": "production"
-  }
+	"framework": "vite",
+	"installCommand": "npm install --prefix client",
+	"buildCommand": "npm run build --prefix client",
+	"outputDirectory": "client/dist"
 }

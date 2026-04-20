@@ -15,7 +15,7 @@ export default function Scene1_Hero({ sceneProgress = 0 }) {
 
   useEffect(() => {
     let rafId = 0
-    const startAt = performance.now() + 260
+    const startAt = performance.now() + 120
     const duration = 1850
 
     const tick = (now) => {
@@ -49,7 +49,7 @@ export default function Scene1_Hero({ sceneProgress = 0 }) {
 
     const timeoutId = window.setTimeout(() => {
       setShowIdleHint(true)
-    }, 2800)
+    }, 1600)
 
     return () => {
       window.clearTimeout(timeoutId)

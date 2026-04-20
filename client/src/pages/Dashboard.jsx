@@ -197,6 +197,9 @@ export default function Dashboard() {
   const forkedShelfCount = Object.values(shelfIsForkedById).filter(Boolean).length;
   const latestLink = recentLinks[0] || null;
   const staleLinkCount = dashboardLinks.filter((link) => link.status === 'dead').length;
+  const activeLinkCount = Math.max(totalLinkCount - staleLinkCount, 0);
+  const activeRatio = totalLinkCount > 0 ? Math.round((activeLinkCount / totalLinkCount) * 100) : 0;
+  const shelfCoverage = allShelfIds.length > 0 ? Math.round((forkedShelfCount / allShelfIds.length) * 100) : 0;
 
   const formatMinutesIdle = (minutesIdle) => {
     if (typeof minutesIdle !== 'number' || Number.isNaN(minutesIdle)) return 'now';
@@ -255,6 +258,85 @@ export default function Dashboard() {
                 <Link to="/profile" className="theme-button-secondary inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold">
                   View profile
                 </Link>
+              </div>
+            </motion.section>
+
+            <motion.section
+              className="theme-card rounded-[32px] p-5 md:p-6 lg:col-span-2"
+              variants={cardVariants}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ y: -2, scale: 1.002 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 22 }}
+            >
+              <div className="theme-card-content grid gap-3 md:grid-cols-3">
+                <div className="theme-panel rounded-[26px] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="theme-subtle-label font-semibold">Saved</p>
+                      <p className="text-2xl font-bold text-[#20314d] mt-1">{totalLinkCount}</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-white/80 border border-white/85 flex items-center justify-center shadow-[0_10px_20px_rgba(132,158,202,0.16)]">
+                      <div className="grid grid-cols-3 gap-[3px] h-5 items-end">
+                        {[34, 58, 82].map((height) => (
+                          <span
+                            key={height}
+                            className="w-1.5 rounded-full bg-gradient-to-t from-[#F4845F] to-[#E8617A]"
+                            style={{ height: `${height}%` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 rounded-full bg-white/70 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#F4845F] via-[#F7B8D7] to-[#7f9fd6]" style={{ width: `${Math.min(totalLinkCount * 12, 100)}%` }} />
+                  </div>
+                </div>
+
+                <div className="theme-panel rounded-[26px] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="theme-subtle-label font-semibold">Fresh</p>
+                      <p className="text-2xl font-bold text-[#20314d] mt-1">{activeRatio}%</p>
+                    </div>
+                    <div
+                      className="w-12 h-12 rounded-full border border-white/85 shadow-[0_10px_20px_rgba(132,158,202,0.16)]"
+                      style={{ background: `conic-gradient(#F4845F ${activeRatio * 3.6}deg, rgba(95,116,152,0.18) 0deg)` }}
+                    >
+                      <div className="w-full h-full rounded-full grid place-items-center bg-white/75 backdrop-blur-sm">
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#F4845F] to-[#E8617A]" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 rounded-full bg-white/70 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#7f9fd6] to-[#F4845F]" style={{ width: `${activeRatio}%` }} />
+                  </div>
+                </div>
+
+                <div className="theme-panel rounded-[26px] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="theme-subtle-label font-semibold">Forked</p>
+                      <p className="text-2xl font-bold text-[#20314d] mt-1">{forkedShelfCount}</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-white/80 border border-white/85 flex items-center justify-center shadow-[0_10px_20px_rgba(132,158,202,0.16)] text-[#F4845F] text-sm font-bold">
+                      {shelfCoverage}%
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    {[0, 1, 2, 3, 4].map((index) => (
+                      <span
+                        key={index}
+                        className="flex-1 rounded-full bg-white/65 overflow-hidden h-2"
+                      >
+                        <span
+                          className="block h-full rounded-full bg-gradient-to-r from-[#B7E7FF] via-[#F7B8D7] to-[#F4845F]"
+                          style={{ width: `${Math.max(26, 100 - index * 14)}%` }}
+                        />
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </motion.section>
 
