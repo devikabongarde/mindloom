@@ -174,7 +174,10 @@ See extension setup guide:
 
 [![GitHub contributors](https://img.shields.io/github/contributors/devikabongarde/mindloom?style=for-the-badge)](https://github.com/devikabongarde/mindloom/graphs/contributors)
 
-[![Contributors](https://contrib.rocks/image?repo=devikabongarde/mindloom)](https://github.com/devikabongarde/mindloom/graphs/contributors)
+[![Contributors](https://contributors-img.web.app/image?repo=devikabongarde/mindloom)](https://github.com/devikabongarde/mindloom/graphs/contributors)
+
+If the image does not load immediately after visibility changes, open the contributors graph directly:
+https://github.com/devikabongarde/mindloom/graphs/contributors
 
 ## Project Status
 
