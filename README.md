@@ -176,8 +176,6 @@ See extension setup guide:
 
 [![Contributors](https://contributors-img.web.app/image?repo=devikabongarde/mindloom)](https://github.com/devikabongarde/mindloom/graphs/contributors)
 
-If the image does not load immediately after visibility changes, open the contributors graph directly:
-https://github.com/devikabongarde/mindloom/graphs/contributors
 
 ## Project Status
 
