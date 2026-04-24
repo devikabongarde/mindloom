@@ -99,13 +99,13 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse = () => 
         <div className={`theme-card-content flex items-center pb-5 border-b border-white/60 ${isCollapsed ? 'justify-center pt-6' : 'gap-3 pr-10'}`}>
           <img
             src="/logoo.png"
-            alt="ShelfLife logo"
+            alt="MindLoom logo"
             className="w-11 h-11 rounded-full object-cover shadow-sm shadow-slate-400/30 flex-shrink-0"
           />
           {!isCollapsed && (
             <div>
               <span className="font-bold text-lg bg-gradient-to-r from-[#F4845F] to-[#E8617A] bg-clip-text text-transparent tracking-tight font-['Sora'] block leading-none">
-                SHELFLIFE
+                MINDLOOM
               </span>
               <p className="theme-muted text-xs mt-1">Living archive</p>
             </div>

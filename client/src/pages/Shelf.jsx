@@ -147,7 +147,7 @@ export default function Shelf() {
         const nextShelfId = normalized[0]._id;
         try {
           await api.patch('/api/auth/me', { defaultShelfId: nextShelfId });
-          const token = localStorage.getItem('shelflife_token');
+          const token = localStorage.getItem('mindloom_token');
           if (token && user) {
             login(token, { ...user, defaultShelfId: nextShelfId });
           }
@@ -207,7 +207,7 @@ export default function Shelf() {
 
       try {
         await api.patch('/api/auth/me', { defaultShelfId: data._id });
-        const token = localStorage.getItem('shelflife_token');
+        const token = localStorage.getItem('mindloom_token');
         if (token && user) {
           login(token, { ...user, defaultShelfId: data._id });
         }

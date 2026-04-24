@@ -130,8 +130,8 @@ Output ONLY the JSON object with "summary" and "vibes".
         headers: {
           'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type':  'application/json',
-          'HTTP-Referer':  'https://shelflife.app',
-          'X-Title':       'SHELFLIFE Ingestion Pipeline',
+          'HTTP-Referer':  'https://mindloom.app',
+          'X-Title':       'MINDLOOM Ingestion Pipeline',
         },
         timeout: 20000,
       }
@@ -244,8 +244,8 @@ Return ONLY the label — no quotes, no punctuation, no extra text.`;
         headers: {
           'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type':  'application/json',
-          'HTTP-Referer':  'https://shelflife.app',
-          'X-Title':       'SHELFLIFE Study Topic Tagger',
+          'HTTP-Referer':  'https://mindloom.app',
+          'X-Title':       'MINDLOOM Study Topic Tagger',
         },
         timeout: 12000,
       }

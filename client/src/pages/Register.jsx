@@ -34,11 +34,11 @@ export default function Register() {
         <div className="flex items-center gap-2 mb-6">
           <img
             src="/logo-white.png"
-            alt="ShelfLife logo"
+            alt="MindLoom logo"
             className="w-7 h-7 rounded-full object-cover shadow-sm shadow-slate-400/30"
           />
           <span className="font-bold text-lg bg-gradient-to-r from-[#F4845F] to-[#E8617A] bg-clip-text text-transparent font-['Sora']">
-            SHELFLIFE
+            MINDLOOM
           </span>
         </div>
 

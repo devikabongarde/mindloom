@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 
 const dustParticles = Array.from({ length: 28 })
-const introSentence = "don't just store resources. shelflife resurrects them."
-const introLines = ["don't just store resources.", 'shelflife resurrects them.']
+const introSentence = "don't just store resources. mindloom resurrects them."
+const introLines = ["don't just store resources.", 'mindloom resurrects them.']
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
@@ -144,7 +144,7 @@ export default function Scene1_Hero({ sceneProgress = 0 }) {
               transform: `translateY(${Math.round((1 - taglineProgress) * 8)}px)`,
             }}
           >
-            shelflife organizes what you store.
+            mindloom organizes what you store.
           </p>
         </div>
       </motion.div>

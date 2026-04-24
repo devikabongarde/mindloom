@@ -12,7 +12,7 @@ function question(query) {
 }
 
 async function setupTelegramWebhook() {
-  console.log('\n🤖 SHELFLIFE Telegram Bot Setup\n');
+  console.log('\n🤖 MINDLOOM Telegram Bot Setup\n');
   console.log('This script will help you set up your Telegram webhook.\n');
 
   const token = process.env.TELEGRAM_BOT_TOKEN;

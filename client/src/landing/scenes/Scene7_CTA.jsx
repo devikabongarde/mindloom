@@ -43,7 +43,7 @@ export default function Scene7_CTA() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.98 }}
               className="cta-button"
-              href="/shelflife-quick-save.zip"
+              href="/mindloom-quick-save.zip"
               download
             >
               DOWNLOAD EXTENSION

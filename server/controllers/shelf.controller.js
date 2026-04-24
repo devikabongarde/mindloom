@@ -19,7 +19,7 @@ async function sendInviteToTelegramIfAvailable(email, inviteUrl, shelfName = 'a 
   if (!botToken) return false;
 
   const text = [
-    'You received a SHELFLIFE shelf invite.',
+    'You received a MINDLOOM shelf invite.',
     '',
     `Shelf: ${shelfName}`,
     `Invite link: ${inviteUrl}`,

@@ -299,7 +299,7 @@ export default function Profile() {
       };
 
       const { data } = await api.patch('/api/auth/me', payload);
-      const token = localStorage.getItem('shelflife_token');
+      const token = localStorage.getItem('mindloom_token');
       if (token) login(token, data);
       setProfileMessage('Profile updated successfully.');
     } catch (err) {
@@ -334,7 +334,7 @@ export default function Profile() {
   };
 
   const updateAuthUser = (nextUser) => {
-    const token = localStorage.getItem('shelflife_token');
+    const token = localStorage.getItem('mindloom_token');
     if (token) login(token, nextUser);
   };
 

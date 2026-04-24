@@ -8,11 +8,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('shelflife_token');
+    const token = localStorage.getItem('mindloom_token');
     if (token) {
       api.get('/api/auth/me')
         .then((res) => setUser(res.data))
-        .catch(() => localStorage.removeItem('shelflife_token'))
+        .catch(() => localStorage.removeItem('mindloom_token'))
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -20,12 +20,12 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = (token, userData) => {
-    localStorage.setItem('shelflife_token', token);
+    localStorage.setItem('mindloom_token', token);
     setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem('shelflife_token');
+    localStorage.removeItem('mindloom_token');
     setUser(null);
   };
 

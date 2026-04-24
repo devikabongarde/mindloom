@@ -74,7 +74,7 @@ export const telegramWebhook = async (req, res) => {
     if (!user) {
       await sendMessage(
         chatId,
-        "Hi! I'm the *SHELFLIFE* bot. 📚\n\nI don't recognize your Telegram account yet.\n\nYour Telegram ID is: `" + telegramUserId + "`\n\nAsk the team to link this ID to your SHELFLIFE account."
+        "Hi! I'm the *MINDLOOM* bot. 📚\n\nI don't recognize your Telegram account yet.\n\nYour Telegram ID is: `" + telegramUserId + "`\n\nAsk the team to link this ID to your MINDLOOM account."
       );
       return res.status(200).json({ ok: true });
     }
@@ -97,7 +97,7 @@ export const telegramWebhook = async (req, res) => {
     if (command === "/start" || command === "/help") {
       await sendMessage(
         chatId,
-        "*Welcome to SHELFLIFE Study Bot* 📚\n\n" +
+        "*Welcome to MINDLOOM Study Bot* 📚\n\n" +
           "I can help you browse and export your shelves:\n\n" +
           "`/shelves` — list your shelves\n" +
           "`/shelf [name]` — recent links in a shelf\n" +
@@ -113,7 +113,7 @@ export const telegramWebhook = async (req, res) => {
       if (shelves.length === 0) {
         await sendMessage(
           chatId,
-          "You have no shelves yet. Create one in the SHELFLIFE dashboard."
+          "You have no shelves yet. Create one in the MINDLOOM dashboard."
         );
       } else {
         const lines = await Promise.all(
@@ -197,7 +197,7 @@ export const telegramWebhook = async (req, res) => {
             await sendDocument(
               chatId,
               filePath,
-              `📄 ${shelf.name} — SHELFLIFE Archive`
+              `📄 ${shelf.name} — MINDLOOM Archive`
             );
           } catch (err) {
             console.error("PDF error:", err.message);

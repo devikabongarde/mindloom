@@ -1,12 +1,12 @@
 const DEFAULT_API_BASE_URL = 'http://localhost:5000';
-const MENU_ROOT = 'shelflife-root';
-const MENU_SAVE_DEFAULT = 'shelflife-save-default';
-const MENU_SAVE_SUB = 'shelflife-save-sub';
-const MENU_SET_DEFAULT_SUB = 'shelflife-set-default-sub';
-const MENU_REFRESH = 'shelflife-refresh';
-const MENU_OPTIONS = 'shelflife-options';
-const MENU_SAVE_PREFIX = 'shelflife-save::';
-const MENU_DEFAULT_PREFIX = 'shelflife-default::';
+const MENU_ROOT = 'mindloom-root';
+const MENU_SAVE_DEFAULT = 'mindloom-save-default';
+const MENU_SAVE_SUB = 'mindloom-save-sub';
+const MENU_SET_DEFAULT_SUB = 'mindloom-set-default-sub';
+const MENU_REFRESH = 'mindloom-refresh';
+const MENU_OPTIONS = 'mindloom-options';
+const MENU_SAVE_PREFIX = 'mindloom-save::';
+const MENU_DEFAULT_PREFIX = 'mindloom-default::';
 const MENU_CONTEXTS = ['action', 'page', 'link'];
 let menuRebuildChain = Promise.resolve();
 
@@ -31,14 +31,14 @@ async function safeSetBadge(text, color) {
   try {
     await setBadge(text, color);
   } catch (err) {
-    console.warn('ShelfLife badge update failed:', err);
+    console.warn('MindLoom badge update failed:', err);
   }
 }
 
 async function clearBadgeSoon(ms = 1800) {
   setTimeout(() => {
     chrome.action.setBadgeText({ text: '' }).catch((err) => {
-      console.warn('ShelfLife badge clear failed:', err);
+      console.warn('MindLoom badge clear failed:', err);
     });
   }, ms);
 }
@@ -58,7 +58,7 @@ async function getDefaultShelfId(apiBaseUrl, token) {
   const data = await res.json();
   const defaultShelfId = data?.defaultShelfId || '';
   if (!defaultShelfId) {
-    throw new Error('No default shelf found. Set one in ShelfLife profile.');
+    throw new Error('No default shelf found. Set one in MindLoom profile.');
   }
 
   return String(defaultShelfId);
@@ -103,7 +103,7 @@ async function rebuildContextMenus() {
 
   await createMenuItem({
     id: MENU_ROOT,
-    title: 'ShelfLife',
+    title: 'MindLoom',
     contexts: MENU_CONTEXTS,
   });
 
@@ -132,7 +132,7 @@ async function rebuildContextMenus() {
 
   if (!settings.token) {
     await createMenuItem({
-      id: 'shelflife-no-token',
+      id: 'mindloom-no-token',
       parentId: MENU_ROOT,
       title: 'Set token in options first',
       enabled: false,
@@ -151,7 +151,7 @@ async function rebuildContextMenus() {
 
       if (shelves.length === 0) {
         await createMenuItem({
-          id: 'shelflife-no-shelves',
+          id: 'mindloom-no-shelves',
           parentId: MENU_ROOT,
           title: 'No shelves found',
           enabled: false,
@@ -182,18 +182,18 @@ async function rebuildContextMenus() {
       }
     } catch (err) {
       await createMenuItem({
-        id: 'shelflife-shelves-error',
+        id: 'mindloom-shelves-error',
         parentId: MENU_ROOT,
         title: 'Could not load shelves',
         enabled: false,
         contexts: MENU_CONTEXTS,
       });
-      console.warn('ShelfLife menu rebuild warning:', err);
+      console.warn('MindLoom menu rebuild warning:', err);
     }
   }
 
   await createMenuItem({
-    id: 'shelflife-sep-2',
+    id: 'mindloom-sep-2',
     parentId: MENU_ROOT,
     type: 'separator',
     contexts: MENU_CONTEXTS,
@@ -223,7 +223,7 @@ function queueRebuildContextMenus() {
       try {
         await rebuildContextMenus();
       } catch (err) {
-        console.warn('ShelfLife menu rebuild warning:', err);
+        console.warn('MindLoom menu rebuild warning:', err);
       }
     });
 
@@ -245,7 +245,7 @@ async function getUrlFromContext(info, tab) {
   return fallback;
 }
 
-async function saveUrlToShelfLife(url, forcedShelfId = '') {
+async function saveUrlToMindLoom(url, forcedShelfId = '') {
   const { apiBaseUrl, token, defaultShelfId, legacyShelfId } = await getSettings();
 
   if (!token) {
@@ -294,10 +294,10 @@ async function saveUrlToShelfLife(url, forcedShelfId = '') {
   await clearBadgeSoon();
 }
 
-async function saveCurrentTabToShelfLife() {
+async function saveCurrentTabToMindLoom() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = (tab?.url || '').trim();
-  await saveUrlToShelfLife(url);
+  await saveUrlToMindLoom(url);
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -338,14 +338,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
     if (id === MENU_SAVE_DEFAULT) {
       const url = await getUrlFromContext(info, tab);
-      await saveUrlToShelfLife(url);
+      await saveUrlToMindLoom(url);
       return;
     }
 
     if (id.startsWith(MENU_SAVE_PREFIX)) {
       const shelfId = id.slice(MENU_SAVE_PREFIX.length);
       const url = await getUrlFromContext(info, tab);
-      await saveUrlToShelfLife(url, shelfId);
+      await saveUrlToMindLoom(url, shelfId);
       return;
     }
 
@@ -359,14 +359,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   } catch (err) {
     await safeSetBadge('ERR', '#B91C1C');
     await clearBadgeSoon(2600);
-    console.warn('ShelfLife context menu warning:', err);
+    console.warn('MindLoom context menu warning:', err);
   }
 });
 
 chrome.action.onClicked.addListener(() => {
-  void saveCurrentTabToShelfLife().catch(async (err) => {
+  void saveCurrentTabToMindLoom().catch(async (err) => {
     await safeSetBadge('ERR', '#B91C1C');
     await clearBadgeSoon(2600);
-    console.warn('ShelfLife Quick Save warning:', err);
+    console.warn('MindLoom Quick Save warning:', err);
   });
 });

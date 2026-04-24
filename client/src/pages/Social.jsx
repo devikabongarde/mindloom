@@ -278,7 +278,7 @@ export default function Social() {
       if (data?._id) {
         try {
           await api.patch('/api/auth/me', { defaultShelfId: data._id });
-          const token = localStorage.getItem('shelflife_token');
+          const token = localStorage.getItem('mindloom_token');
           if (token && user) {
             login(token, { ...user, defaultShelfId: data._id });
           }

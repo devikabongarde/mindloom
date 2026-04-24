@@ -59,7 +59,7 @@ app.use('/api/social',    socialRoutes);
 app.use('/api/chat',      chatRoutes);
 // app.use('/api/whatsapp',  whatsappRoutes);
 app.use('/api/telegram',  telegramRoutes);
-app.get('/', (req, res) => res.json({ message: 'SHELFLIFE API running' }));
+app.get('/', (req, res) => res.json({ message: 'MINDLOOM API running' }));
 
 // Friendly body-size error for uploads encoded as base64 JSON.
 app.use((err, req, res, next) => {

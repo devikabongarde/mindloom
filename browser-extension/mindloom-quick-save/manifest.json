@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "ShelfLife Quick Save",
-  "description": "Save the current tab URL into ShelfLife with one click.",
+  "name": "MindLoom Quick Save",
+  "description": "Save the current tab URL into MindLoom with one click.",
   "version": "1.0.0",
   "permissions": [
     "storage",
@@ -22,7 +22,7 @@
     "128": "icons/logoo.png"
   },
   "action": {
-    "default_title": "Save tab to ShelfLife",
+    "default_title": "Save tab to MindLoom",
     "default_icon": "icons/logoo.png"
   },
   "options_page": "options.html"

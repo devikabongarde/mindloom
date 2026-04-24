@@ -11,7 +11,7 @@ export function getSocket() {
     socket = io(URL, {
       autoConnect: false,
       auth: (cb) => {
-        const token = localStorage.getItem('shelflife_token');
+        const token = localStorage.getItem('mindloom_token');
         cb({ token });
       },
     });

@@ -56,7 +56,7 @@ function ShelfRedirect() {
       })
       .then((shelf) => {
         // Update local auth state so user.defaultShelfId is set
-        login(localStorage.getItem('shelflife_token'), {
+        login(localStorage.getItem('mindloom_token'), {
           ...user,
           defaultShelfId: shelf._id,
         });

@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ShelfLife Quick Save - Settings</title>
+    <title>MindLoom Quick Save - Settings</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
     <main class="wrap">
-      <h1>ShelfLife Quick Save</h1>
+      <h1>MindLoom Quick Save</h1>
       <p class="muted">Configure your API URL and auth token once, then click the extension icon on any page to save that URL.</p>
 
       <form id="settings-form" class="card">
@@ -19,7 +19,7 @@
 
         <label>
           JWT Token
-          <textarea id="token" rows="4" placeholder="Paste your shelflife_token"></textarea>
+          <textarea id="token" rows="4" placeholder="Paste your mindloom_token"></textarea>
         </label>
 
         <label>
@@ -38,9 +38,9 @@
       <section class="card hint">
         <h2>Where to get token?</h2>
         <ol>
-          <li>Log in to ShelfLife web app.</li>
+          <li>Log in to MindLoom web app.</li>
           <li>Open browser DevTools Console on your app tab.</li>
-          <li>Run: <code>localStorage.getItem('shelflife_token')</code></li>
+          <li>Run: <code>localStorage.getItem('mindloom_token')</code></li>
           <li>Copy and paste into JWT Token above.</li>
         </ol>
       </section>

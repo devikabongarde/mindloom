@@ -54,7 +54,7 @@ export default function Scene3_Solution() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9 }}
         >
-          Meet ShelfLife
+          Meet MindLoom
         </motion.h2>
         <motion.p
           className="scene-subline"

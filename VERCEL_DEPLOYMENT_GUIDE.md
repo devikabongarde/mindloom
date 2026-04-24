@@ -1,4 +1,4 @@
-# ShelfLife Vercel Deployment Guide
+# MindLoom Vercel Deployment Guide
 
 ## Project Structure Overview
 - **Backend**: Express.js server in `/server` folder
@@ -38,7 +38,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('shelflife_token');
+  const token = localStorage.getItem('mindloom_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -55,7 +55,7 @@ export default api;
 ### Backend (Server) - Required for Vercel
 ```
 # Database
-MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/shelflife?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/mindloom?retryWrites=true&w=majority
 
 # JWT Authentication
 JWT_SECRET=your-secret-key-here-min-32-chars
@@ -110,7 +110,7 @@ VITE_SOCKET_URL=https://your-backend-api.vercel.app
 **3A.2 Deploy Backend**
 1. Click "Deploy"
 2. Wait for deployment to complete
-3. Note your backend URL (e.g., `https://shelflife-api.vercel.app`)
+3. Note your backend URL (e.g., `https://mindloom-api.vercel.app`)
 
 ### Option B: Deploy Frontend
 
@@ -140,7 +140,7 @@ In Vercel dashboard for frontend project:
 1. Go to [mongodb.com/cloud/atlas](https://mongodb.com/cloud/atlas)
 2. Create a free cluster
 3. Create database user (note username/password)
-4. Get connection string: `mongodb+srv://user:pass@cluster.mongodb.net/shelflife`
+4. Get connection string: `mongodb+srv://user:pass@cluster.mongodb.net/mindloom`
 5. Add to Vercel env vars as `MONGO_URI`
 
 ### JWT Secret Generation
