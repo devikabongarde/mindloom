@@ -38,7 +38,6 @@ MindLoom is a collaborative, AI-powered social bookmarking platform where people
 ├─ browser-extension/
 │  └─ mindloom-quick-save/        # Chrome extension for quick link capture
 ├─ QUICKSTART.md                  # Bot-oriented quick-start doc
-├─ VERCEL_DEPLOYMENT_GUIDE.md     # Deployment guide
 └─ README.md                      # You are here
 ```
 
@@ -165,10 +164,6 @@ See extension setup guide:
 ## Related Docs
 
 - `QUICKSTART.md`
-- `VERCEL_DEPLOYMENT_GUIDE.md`
-- `MEMBER_MANAGEMENT.md`
-- `VIBE_IMPROVEMENTS.md`
-- `BOT_NOT_RESPONDING.md`
 
 ## Contributors
 
